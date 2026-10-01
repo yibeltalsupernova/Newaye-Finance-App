@@ -27,31 +27,14 @@ data class TransactionEntity(
 
     val accountId: Long,
 
-    /**
-     * INCOME or EXPENSE
-     */
     val type: String,
 
-    /**
-     * Positive monetary amount.
-     */
     val amount: Double,
 
-    /**
-     * User-defined category.
-     * Examples:
-     * Salary, Food, Transport, Rent, Shopping
-     */
     val category: String,
 
-    /**
-     * Optional description.
-     */
     val note: String = "",
 
-    /**
-     * Transaction timestamp in milliseconds.
-     */
     val date: Long = System.currentTimeMillis(),
 
     val currency: String = "ETB",
