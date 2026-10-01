@@ -119,6 +119,7 @@ fun NewayeApp(database: NewayeDatabase) {
                     when (tab) {
 
                         0 -> Dashboard(
+                            database = database,
                             onAccountsClick = {
                                 showAccounts = true
                             }
