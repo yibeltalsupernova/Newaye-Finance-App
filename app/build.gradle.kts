@@ -5,7 +5,7 @@ plugins {
 
 android {
     namespace = "com.newaye.finance"
-    compileSdk = 36
+    compileSdk = 37
 
     defaultConfig {
         applicationId = "com.newaye.finance"
@@ -28,7 +28,7 @@ android {
 
 dependencies {
     val composeBom =
-        platform("androidx.compose:compose-bom:2026.09.00")
+    platform("androidx.compose:compose-bom:2025.08.01")
 
     implementation(composeBom)
 
