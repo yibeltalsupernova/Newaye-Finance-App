@@ -1,11 +1,12 @@
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.plugin.compose")
+    id("com.google.devtools.ksp")
 }
 
 android {
     namespace = "com.newaye.finance"
-    compileSdk = 37
+    compileSdk = 36
 
     defaultConfig {
         applicationId = "com.newaye.finance"
@@ -28,7 +29,7 @@ android {
 
 dependencies {
     val composeBom =
-    platform("androidx.compose:compose-bom:2025.08.01")
+        platform("androidx.compose:compose-bom:2025.08.01")
 
     implementation(composeBom)
 
@@ -38,6 +39,13 @@ dependencies {
     implementation("androidx.compose.ui:ui")
     implementation("androidx.compose.ui:ui-tooling-preview")
     implementation("androidx.core:core-ktx:1.17.0")
+
+    // Room Database
+    val roomVersion = "2.8.5"
+
+    implementation("androidx.room:room-runtime:$roomVersion")
+    implementation("androidx.room:room-ktx:$roomVersion")
+    ksp("androidx.room:room-compiler:$roomVersion")
 
     debugImplementation(
         "androidx.compose.ui:ui-tooling"
