@@ -14,6 +14,9 @@ interface AccountDao {
     @Query("SELECT * FROM accounts ORDER BY name ASC")
     fun getAllAccounts(): Flow<List<AccountEntity>>
 
+    @Query("SELECT COALESCE(SUM(balance), 0.0) FROM accounts WHERE isActive = 1")
+    fun getTotalBalance(): Flow<Double>
+
     @Query("SELECT * FROM accounts WHERE id = :id LIMIT 1")
     suspend fun getAccountById(id: Long): AccountEntity?
 
