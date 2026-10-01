@@ -4,6 +4,8 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
@@ -15,6 +17,10 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.newaye.finance.data.local.NewayeDatabase
+import com.newaye.finance.data.local.entity.AccountEntity
+import kotlinx.coroutines.launch
 
 private val DeepGreen = Color(0xFF004D00)
 private val Green = Color(0xFF007A33)
@@ -26,17 +32,23 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
+        val database = NewayeDatabase.getDatabase(this)
+
         setContent {
-            NewayeApp()
+            NewayeApp(database)
         }
     }
 }
 
 @Composable
-fun NewayeApp() {
+fun NewayeApp(database: NewayeDatabase) {
 
     var tab by remember {
         mutableIntStateOf(0)
+    }
+
+    var showAccounts by remember {
+        mutableStateOf(false)
     }
 
     val items = listOf(
@@ -55,60 +67,75 @@ fun NewayeApp() {
         )
     ) {
 
-        Scaffold(
+        if (showAccounts) {
 
-            bottomBar = {
+            AccountsScreen(
+                database = database,
+                onBack = {
+                    showAccounts = false
+                }
+            )
 
-                NavigationBar {
+        } else {
 
-                    items.forEachIndexed { index, item ->
+            Scaffold(
 
-                        NavigationBarItem(
+                bottomBar = {
 
-                            selected = tab == index,
+                    NavigationBar {
 
-                            onClick = {
-                                tab = index
-                            },
+                        items.forEachIndexed { index, item ->
 
-                            icon = {
-                                Icon(
-                                    imageVector = item.second,
-                                    contentDescription = item.first
-                                )
-                            },
+                            NavigationBarItem(
+                                selected = tab == index,
 
-                            label = {
-                                Text(item.first)
-                            }
-                        )
+                                onClick = {
+                                    tab = index
+                                },
+
+                                icon = {
+                                    Icon(
+                                        imageVector = item.second,
+                                        contentDescription = item.first
+                                    )
+                                },
+
+                                label = {
+                                    Text(item.first)
+                                }
+                            )
+                        }
                     }
                 }
-            }
 
-        ) { padding ->
+            ) { padding ->
 
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(padding)
-            ) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(padding)
+                ) {
 
-                when (tab) {
+                    when (tab) {
 
-                    0 -> Dashboard()
+                        0 -> Dashboard(
+                            onAccountsClick = {
+                                showAccounts = true
+                            }
+                        )
 
-                    1 -> Placeholder(
-                        "Analytics",
-                        "Your financial insights will appear here."
-                    )
+                        1 -> Placeholder(
+                            "Analytics",
+                            "Your financial insights will appear here."
+                        )
 
-                    2 -> Placeholder(
-                        "Budget",
-                        "Create and manage budgets here."
-                    )
+                        2 -> Placeholder(
+                            "Budget",
+                            "Create and manage budgets here."
+                        )
 
-                    3 -> Settings()
+                        3 -> Settings()
+                    }
                 }
             }
         }
@@ -116,16 +143,16 @@ fun NewayeApp() {
 }
 
 @Composable
-fun Dashboard() {
+fun Dashboard(
+    onAccountsClick: () -> Unit
+) {
 
     Column(
-
         modifier = Modifier
             .fillMaxSize()
             .padding(20.dp),
 
         verticalArrangement = Arrangement.spacedBy(16.dp)
-
     ) {
 
         Text(
@@ -148,15 +175,11 @@ fun Dashboard() {
         )
 
         Card(
-
             modifier = Modifier.fillMaxWidth(),
-
             shape = RoundedCornerShape(24.dp),
-
             colors = CardDefaults.cardColors(
                 containerColor = DeepGreen
             )
-
         ) {
 
             Column(
@@ -180,19 +203,15 @@ fun Dashboard() {
                 )
 
                 Text(
-                    "No accounts added yet",
+                    "Add accounts to see your balance",
                     color = Color.White.copy(alpha = .7f)
                 )
             }
         }
 
         Row(
-
             modifier = Modifier.fillMaxWidth(),
-
-            horizontalArrangement =
-                Arrangement.spacedBy(12.dp)
-
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
 
             SmallCard(
@@ -210,16 +229,30 @@ fun Dashboard() {
             )
         }
 
-        Card(
-
+        Button(
+            onClick = onAccountsClick,
             modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(18.dp)
+        ) {
 
+            Icon(
+                imageVector = Icons.Default.AccountBalanceWallet,
+                contentDescription = null
+            )
+
+            Spacer(
+                modifier = Modifier.width(8.dp)
+            )
+
+            Text("Manage Accounts")
+        }
+
+        Card(
+            modifier = Modifier.fillMaxWidth(),
             colors = CardDefaults.cardColors(
                 containerColor = VeryLight
             ),
-
             shape = RoundedCornerShape(20.dp)
-
         ) {
 
             Column(
@@ -248,13 +281,374 @@ fun Dashboard() {
         )
 
         Text(
-            text = "Milestone 1 • Foundation",
+            text = "Milestone 2 • Accounts",
             color = LightGreen,
             modifier = Modifier.align(
                 Alignment.CenterHorizontally
             )
         )
     }
+}
+
+@Composable
+fun AccountsScreen(
+    database: NewayeDatabase,
+    onBack: () -> Unit
+) {
+
+    val accounts by database
+        .accountDao()
+        .getAllAccounts()
+        .collectAsStateWithLifecycle(
+            initialValue = emptyList()
+        )
+
+    var showAddAccount by remember {
+        mutableStateOf(false)
+    }
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(20.dp)
+    ) {
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+
+            IconButton(
+                onClick = onBack
+            ) {
+
+                Icon(
+                    imageVector = Icons.Default.ArrowBack,
+                    contentDescription = "Back"
+                )
+            }
+
+            Text(
+                text = "Accounts",
+                color = DeepGreen,
+                fontSize = 28.sp,
+                fontWeight = FontWeight.Bold
+            )
+        }
+
+        Spacer(
+            modifier = Modifier.height(12.dp)
+        )
+
+        if (accounts.isEmpty()) {
+
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f),
+
+                horizontalAlignment =
+                    Alignment.CenterHorizontally,
+
+                verticalArrangement =
+                    Arrangement.Center
+            ) {
+
+                Icon(
+                    imageVector =
+                        Icons.Default.AccountBalanceWallet,
+
+                    contentDescription = null,
+
+                    tint = LightGreen,
+
+                    modifier = Modifier.size(64.dp)
+                )
+
+                Spacer(
+                    modifier = Modifier.height(12.dp)
+                )
+
+                Text(
+                    "No accounts yet",
+                    fontSize = 20.sp,
+                    fontWeight = FontWeight.Bold
+                )
+
+                Text(
+                    "Add your first money account."
+                )
+            }
+
+        } else {
+
+            LazyColumn(
+                modifier = Modifier.weight(1f),
+                verticalArrangement =
+                    Arrangement.spacedBy(12.dp)
+            ) {
+
+                items(
+                    items = accounts,
+                    key = { it.id }
+                ) { account ->
+
+                    AccountCard(account)
+                }
+            }
+        }
+
+        Spacer(
+            modifier = Modifier.height(12.dp)
+        )
+
+        Button(
+            onClick = {
+                showAddAccount = true
+            },
+
+            modifier = Modifier.fillMaxWidth(),
+
+            shape = RoundedCornerShape(18.dp)
+        ) {
+
+            Icon(
+                imageVector = Icons.Default.Add,
+                contentDescription = null
+            )
+
+            Spacer(
+                modifier = Modifier.width(8.dp)
+            )
+
+            Text("Add Account")
+        }
+    }
+
+    if (showAddAccount) {
+
+        AddAccountDialog(
+            database = database,
+
+            onDismiss = {
+                showAddAccount = false
+            }
+        )
+    }
+}
+
+@Composable
+fun AccountCard(
+    account: AccountEntity
+) {
+
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(20.dp)
+    ) {
+
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(18.dp),
+
+            verticalAlignment =
+                Alignment.CenterVertically
+        ) {
+
+            Icon(
+                imageVector = when (account.type) {
+
+                    "Cash" ->
+                        Icons.Default.Payments
+
+                    "Bank" ->
+                        Icons.Default.AccountBalance
+
+                    "Mobile Wallet" ->
+                        Icons.Default.PhoneAndroid
+
+                    else ->
+                        Icons.Default.AccountBalanceWallet
+                },
+
+                contentDescription = null,
+
+                tint = Green,
+
+                modifier = Modifier.size(36.dp)
+            )
+
+            Spacer(
+                modifier = Modifier.width(14.dp)
+            )
+
+            Column(
+                modifier = Modifier.weight(1f)
+            ) {
+
+                Text(
+                    account.name,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 18.sp
+                )
+
+                Text(
+                    account.type,
+                    color = Color.Gray
+                )
+            }
+
+            Text(
+                "ETB %.2f".format(account.balance),
+                fontWeight = FontWeight.Bold,
+                color = DeepGreen
+            )
+        }
+    }
+}
+
+@Composable
+fun AddAccountDialog(
+    database: NewayeDatabase,
+    onDismiss: () -> Unit
+) {
+
+    val scope = rememberCoroutineScope()
+
+    var name by remember {
+        mutableStateOf("")
+    }
+
+    var type by remember {
+        mutableStateOf("Cash")
+    }
+
+    var balance by remember {
+        mutableStateOf("")
+    }
+
+    AlertDialog(
+
+        onDismissRequest = onDismiss,
+
+        title = {
+            Text("Add Account")
+        },
+
+        text = {
+
+            Column(
+                verticalArrangement =
+                    Arrangement.spacedBy(12.dp)
+            ) {
+
+                OutlinedTextField(
+                    value = name,
+
+                    onValueChange = {
+                        name = it
+                    },
+
+                    label = {
+                        Text("Account name")
+                    },
+
+                    singleLine = true
+                )
+
+                Text(
+                    "Account type",
+                    fontWeight = FontWeight.Bold
+                )
+
+                Row(
+                    horizontalArrangement =
+                        Arrangement.spacedBy(8.dp)
+                ) {
+
+                    listOf(
+                        "Cash",
+                        "Bank",
+                        "Mobile Wallet"
+                    ).forEach { option ->
+
+                        FilterChip(
+                            selected =
+                                type == option,
+
+                            onClick = {
+                                type = option
+                            },
+
+                            label = {
+                                Text(option)
+                            }
+                        )
+                    }
+                }
+
+                OutlinedTextField(
+                    value = balance,
+
+                    onValueChange = {
+                        balance = it
+                    },
+
+                    label = {
+                        Text("Opening balance")
+                    },
+
+                    singleLine = true
+                )
+            }
+        },
+
+        confirmButton = {
+
+            TextButton(
+
+                enabled =
+                    name.isNotBlank(),
+
+                onClick = {
+
+                    val amount =
+                        balance.toDoubleOrNull()
+                            ?: 0.0
+
+                    val account =
+                        AccountEntity(
+                            name = name.trim(),
+                            type = type,
+                            balance = amount
+                        )
+
+                    scope.launch {
+
+                        database
+                            .accountDao()
+                            .insertAccount(account)
+
+                        onDismiss()
+                    }
+                }
+            ) {
+
+                Text("Save")
+            }
+        },
+
+        dismissButton = {
+
+            TextButton(
+                onClick = onDismiss
+            ) {
+
+                Text("Cancel")
+            }
+        }
+    )
 }
 
 @Composable
@@ -299,7 +693,6 @@ fun Placeholder(
 ) {
 
     Column(
-
         modifier = Modifier
             .fillMaxSize()
             .padding(24.dp),
@@ -309,7 +702,6 @@ fun Placeholder(
 
         verticalArrangement =
             Arrangement.Center
-
     ) {
 
         Text(
