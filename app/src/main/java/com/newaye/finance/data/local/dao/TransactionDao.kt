@@ -11,73 +11,51 @@ import kotlinx.coroutines.flow.Flow
 @Dao
 interface TransactionDao {
 
-    @Query(
-        """
-        SELECT * FROM transactions
-        ORDER BY date DESC
-        """
-    )
+    @Query("SELECT * FROM transactions ORDER BY date DESC")
     fun getAllTransactions(): Flow<List<TransactionEntity>>
 
     @Query(
-        """
-        SELECT * FROM transactions
-        WHERE accountId = :accountId
-        ORDER BY date DESC
-        """
+        "SELECT * FROM transactions " +
+        "WHERE accountId = :accountId " +
+        "ORDER BY date DESC"
     )
     fun getTransactionsForAccount(
         accountId: Long
     ): Flow<List<TransactionEntity>>
 
     @Query(
-        """
-        SELECT * FROM transactions
-        WHERE id = :id
-        LIMIT 1
-        """
+        "SELECT * FROM transactions " +
+        "WHERE id = :id LIMIT 1"
     )
     suspend fun getTransactionById(
         id: Long
     ): TransactionEntity?
 
     @Query(
-        """
-        SELECT COALESCE(SUM(amount), 0.0)
-        FROM transactions
-        WHERE type = 'INCOME'
-        """
+        "SELECT COALESCE(SUM(amount), 0.0) " +
+        "FROM transactions WHERE type = 'INCOME'"
     )
     fun getTotalIncome(): Flow<Double>
 
     @Query(
-        """
-        SELECT COALESCE(SUM(amount), 0.0)
-        FROM transactions
-        WHERE type = 'EXPENSE'
-        """
+        "SELECT COALESCE(SUM(amount), 0.0) " +
+        "FROM transactions WHERE type = 'EXPENSE'"
     )
     fun getTotalExpenses(): Flow<Double>
 
     @Query(
-        """
-        SELECT COALESCE(SUM(amount), 0.0)
-        FROM transactions
-        WHERE accountId = :accountId
-        AND type = 'INCOME'
-        """
+        "SELECT COALESCE(SUM(amount), 0.0) " +
+        "FROM transactions " +
+        "WHERE accountId = :accountId AND type = 'INCOME'"
     )
     fun getAccountIncome(
         accountId: Long
     ): Flow<Double>
 
     @Query(
-        """
-        SELECT COALESCE(SUM(amount), 0.0)
-        FROM transactions
-        WHERE accountId = :accountId
-        AND type = 'EXPENSE'
-        """
+        "SELECT COALESCE(SUM(amount), 0.0) " +
+        "FROM transactions " +
+        "WHERE accountId = :accountId AND type = 'EXPENSE'"
     )
     fun getAccountExpenses(
         accountId: Long
