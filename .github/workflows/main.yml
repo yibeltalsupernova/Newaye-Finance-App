@@ -25,15 +25,34 @@ jobs:
         with:
           gradle-version: '9.4.1'
 
+      - name: Check Android and Gradle environment
+        run: |
+          echo "ANDROID_HOME=$ANDROID_HOME"
+          echo "ANDROID_SDK_ROOT=$ANDROID_SDK_ROOT"
+          echo "PATH=$PATH"
+          echo "---- sdkmanager ----"
+          which sdkmanager || true
+          echo "---- gradle ----"
+          which gradle || true
+          echo "---- Java ----"
+          java -version
+          echo "---- Gradle ----"
+          gradle --version
+
       - name: Install Android SDK 36
         run: |
+          SDK="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-/usr/local/lib/android/sdk}}"
+          export PATH="$SDK/cmdline-tools/latest/bin:$SDK/platform-tools:$PATH"
+          echo "Using SDK: $SDK"
+          which sdkmanager
           yes | sdkmanager --licenses || true
           sdkmanager "platform-tools"
           sdkmanager "platforms;android-36"
           sdkmanager "build-tools;36.0.0"
 
       - name: Build Newaye APK
-        run: gradle --no-daemon assembleDebug
+        run: |
+          gradle --no-daemon assembleDebug
 
       - name: Upload Newaye APK
         uses: actions/upload-artifact@v4
