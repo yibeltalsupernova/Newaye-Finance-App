@@ -144,8 +144,16 @@ fun NewayeApp(database: NewayeDatabase) {
 
 @Composable
 fun Dashboard(
+    database: NewayeDatabase,
     onAccountsClick: () -> Unit
 ) {
+
+    val totalBalance by database
+        .accountDao()
+        .getTotalBalance()
+        .collectAsStateWithLifecycle(
+            initialValue = 0.0
+        )
 
     Column(
         modifier = Modifier
@@ -196,14 +204,18 @@ fun Dashboard(
                 )
 
                 Text(
-                    "ETB 0.00",
+                    "ETB %.2f".format(totalBalance),
                     color = Color.White,
                     fontSize = 32.sp,
                     fontWeight = FontWeight.Bold
                 )
 
                 Text(
-                    "Add accounts to see your balance",
+                    if (totalBalance == 0.0) {
+                        "No account balance yet"
+                    } else {
+                        "Balance across active accounts"
+                    },
                     color = Color.White.copy(alpha = .7f)
                 )
             }
