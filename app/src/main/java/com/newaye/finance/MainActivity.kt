@@ -1,38 +1,77 @@
 package com.newaye.finance
-
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.compose.ui.text.font.FontWeight
+import kotlinx.coroutines.launch
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.*
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
-import androidx.compose.ui.Alignment
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
+import androidx.compose.material.icons.filled.AccountBalance
+import androidx.compose.material.icons.filled.AccountBalanceWallet
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.ArrowDownward
+import androidx.compose.material.icons.filled.ArrowUpward
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Payments
+import androidx.compose.material.icons.filled.Wallet
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.newaye.finance.data.local.NewayeDatabase
 import com.newaye.finance.data.local.entity.AccountEntity
-import kotlinx.coroutines.launch
+import com.newaye.finance.data.local.entity.TransactionEntity
+import com.newaye.finance.data.repository.TransactionRepository
+import com.newaye.finance.ui.TransactionViewModel
+import com.newaye.finance.ui.TransactionViewModelFactory
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
+import kotlin.math.abs
 
-private val DeepGreen = Color(0xFF004D00)
-private val Green = Color(0xFF007A33)
-private val LightGreen = Color(0xFF66B3A1)
-private val VeryLight = Color(0xFFE0F7F1)
+private val DeepGreen = androidx.compose.ui.graphics.Color(0xFF004D00)
+private val Green = androidx.compose.ui.graphics.Color(0xFF007A33)
+private val LightGreen = androidx.compose.ui.graphics.Color(0xFF66B3A1)
+private val SoftGreen = androidx.compose.ui.graphics.Color(0xFFB2E0D4)
+private val VeryLight = androidx.compose.ui.graphics.Color(0xFFE0F7F1)
 
 class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        val database = NewayeDatabase.getDatabase(this)
+        val database =
+            NewayeDatabase.getDatabase(this)
 
         setContent {
             NewayeApp(database)
@@ -41,103 +80,103 @@ class MainActivity : ComponentActivity() {
 }
 
 @Composable
-fun NewayeApp(database: NewayeDatabase) {
+fun NewayeApp(
+    database: NewayeDatabase
+) {
 
-    var tab by remember {
-        mutableIntStateOf(0)
+    var selectedTab by remember {
+        mutableStateOf(0)
     }
 
     var showAccounts by remember {
         mutableStateOf(false)
     }
 
-    val items = listOf(
-        "Home" to Icons.Default.Home,
-        "Analytics" to Icons.Default.Analytics,
-        "Budget" to Icons.Default.AccountBalanceWallet,
-        "Settings" to Icons.Default.Settings
-    )
+    var showTransactions by remember {
+        mutableStateOf(false)
+    }
 
-    MaterialTheme(
-        colorScheme = lightColorScheme(
-            primary = DeepGreen,
-            secondary = Green,
-            tertiary = LightGreen,
-            background = VeryLight
+    if (showAccounts) {
+
+        AccountsScreen(
+            database = database,
+            onBack = {
+                showAccounts = false
+            }
         )
-    ) {
 
-        if (showAccounts) {
+        return
+    }
 
-            AccountsScreen(
-                database = database,
-                onBack = {
-                    showAccounts = false
-                }
-            )
+    if (showTransactions) {
 
-        } else {
+        TransactionsScreen(
+            database = database,
+            onBack = {
+                showTransactions = false
+            }
+        )
 
-            Scaffold(
+        return
+    }
 
-                bottomBar = {
+    Scaffold(
+        bottomBar = {
 
-                    NavigationBar {
+            Row(
+                modifier = androidx.compose.ui.Modifier
+                    .fillMaxWidth()
+                    .padding(8.dp),
+                horizontalArrangement =
+                    Arrangement.SpaceEvenly
+            ) {
 
-                        items.forEachIndexed { index, item ->
-
-                            NavigationBarItem(
-                                selected = tab == index,
-
-                                onClick = {
-                                    tab = index
-                                },
-
-                                icon = {
-                                    Icon(
-                                        imageVector = item.second,
-                                        contentDescription = item.first
-                                    )
-                                },
-
-                                label = {
-                                    Text(item.first)
-                                }
-                            )
-                        }
+                TextButton(
+                    onClick = {
+                        selectedTab = 0
                     }
-                }
-
-            ) { padding ->
-
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(padding)
                 ) {
-
-                    when (tab) {
-
-                        0 -> Dashboard(
-                            database = database,
-                            onAccountsClick = {
-                                showAccounts = true
-                            }
-                        )
-
-                        1 -> Placeholder(
-                            "Analytics",
-                            "Your financial insights will appear here."
-                        )
-
-                        2 -> Placeholder(
-                            "Budget",
-                            "Create and manage budgets here."
-                        )
-
-                        3 -> Settings()
-                    }
+                    Text("Home")
                 }
+
+                TextButton(
+                    onClick = {
+                        showTransactions = true
+                    }
+                ) {
+                    Text("Transactions")
+                }
+
+                TextButton(
+                    onClick = {
+                        selectedTab = 1
+                    }
+                ) {
+                    Text("Settings")
+                }
+            }
+        }
+    ) { paddingValues ->
+
+        Column(
+            modifier = androidx.compose.ui.Modifier
+                .fillMaxSize()
+                .padding(paddingValues)
+        ) {
+
+            when (selectedTab) {
+
+                0 -> Dashboard(
+                    database = database,
+                    onAccountsClick = {
+                        showAccounts = true
+                    },
+                    onTransactionsClick = {
+                        showTransactions = true
+                    }
+                )
+
+                1 -> Settings()
             }
         }
     }
@@ -146,7 +185,8 @@ fun NewayeApp(database: NewayeDatabase) {
 @Composable
 fun Dashboard(
     database: NewayeDatabase,
-    onAccountsClick: () -> Unit
+    onAccountsClick: () -> Unit,
+    onTransactionsClick: () -> Unit
 ) {
 
     val totalBalance by database
@@ -156,59 +196,84 @@ fun Dashboard(
             initialValue = 0.0
         )
 
+    val totalIncome by database
+        .transactionDao()
+        .getTotalIncome()
+        .collectAsStateWithLifecycle(
+            initialValue = 0.0
+        )
+
+    val totalExpenses by database
+        .transactionDao()
+        .getTotalExpenses()
+        .collectAsStateWithLifecycle(
+            initialValue = 0.0
+        )
+
     Column(
-        modifier = Modifier
+        modifier = androidx.compose.ui.Modifier
             .fillMaxSize()
             .padding(20.dp),
-
-        verticalArrangement = Arrangement.spacedBy(16.dp)
+        verticalArrangement =
+            Arrangement.spacedBy(16.dp)
     ) {
 
         Text(
             text = "ነዋዬ",
             color = DeepGreen,
             fontSize = 32.sp,
-            fontWeight = FontWeight.Bold
+            fontWeight = androidx.compose.ui.text.font.FontWeight.Bold
         )
 
         Text(
             text = "Your Money. Your Control.",
             color = Green,
-            fontWeight = FontWeight.Medium
+            fontWeight =
+                androidx.compose.ui.text.font.FontWeight.Medium
         )
 
         Text(
             text = "Dashboard",
             fontSize = 25.sp,
-            fontWeight = FontWeight.Bold
+            fontWeight =
+                androidx.compose.ui.text.font.FontWeight.Bold
         )
 
         Card(
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(24.dp),
+            modifier = androidx.compose.ui.Modifier
+                .fillMaxWidth(),
+            shape = androidx.compose.foundation.shape.RoundedCornerShape(
+                24.dp
+            ),
             colors = CardDefaults.cardColors(
                 containerColor = DeepGreen
             )
         ) {
 
             Column(
-                modifier = Modifier.padding(22.dp)
+                modifier = androidx.compose.ui.Modifier
+                    .padding(22.dp)
             ) {
 
                 Text(
                     "Total Balance",
-                    color = Color.White.copy(alpha = .8f)
+                    color = androidx.compose.ui.graphics.Color.White
+                        .copy(alpha = .8f)
                 )
 
                 Spacer(
-                    modifier = Modifier.height(8.dp)
+                    modifier = androidx.compose.ui.Modifier
+                        .height(8.dp)
                 )
 
                 Text(
-                    "ETB %.2f".format(totalBalance),
-                    color = Color.White,
+                    "ETB %.2f".format(
+                        totalBalance
+                    ),
+                    color = androidx.compose.ui.graphics.Color.White,
                     fontSize = 32.sp,
-                    fontWeight = FontWeight.Bold
+                    fontWeight =
+                        androidx.compose.ui.text.font.FontWeight.Bold
                 )
 
                 Text(
@@ -217,90 +282,850 @@ fun Dashboard(
                     } else {
                         "Balance across active accounts"
                     },
-                    color = Color.White.copy(alpha = .7f)
+                    color = androidx.compose.ui.graphics.Color.White
+                        .copy(alpha = .7f)
                 )
             }
         }
 
         Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
+            modifier = androidx.compose.ui.Modifier
+                .fillMaxWidth(),
+            horizontalArrangement =
+                Arrangement.spacedBy(12.dp)
         ) {
 
             SmallCard(
                 title = "Income",
-                amount = "ETB 0.00",
+                amount = "ETB %.2f".format(
+                    totalIncome
+                ),
                 accent = Green,
-                modifier = Modifier.weight(1f)
+                modifier = androidx.compose.ui.Modifier
+                    .weight(1f)
             )
 
             SmallCard(
                 title = "Expenses",
-                amount = "ETB 0.00",
+                amount = "ETB %.2f".format(
+                    totalExpenses
+                ),
                 accent = LightGreen,
-                modifier = Modifier.weight(1f)
+                modifier = androidx.compose.ui.Modifier
+                    .weight(1f)
             )
         }
 
         Button(
-            onClick = onAccountsClick,
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(18.dp)
+            onClick = onTransactionsClick,
+            modifier = androidx.compose.ui.Modifier
+                .fillMaxWidth(),
+            shape = androidx.compose.foundation.shape.RoundedCornerShape(
+                18.dp
+            )
         ) {
 
             Icon(
-                imageVector = Icons.Default.AccountBalanceWallet,
+                imageVector = Icons.Default.Payments,
                 contentDescription = null
             )
 
             Spacer(
-                modifier = Modifier.width(8.dp)
+                modifier = androidx.compose.ui.Modifier
+                    .width(8.dp)
+            )
+
+            Text("Manage Transactions")
+        }
+
+        OutlinedButton(
+            onClick = onAccountsClick,
+            modifier = androidx.compose.ui.Modifier
+                .fillMaxWidth(),
+            shape = androidx.compose.foundation.shape.RoundedCornerShape(
+                18.dp
+            )
+        ) {
+
+            Icon(
+                imageVector =
+                    Icons.Default.AccountBalanceWallet,
+                contentDescription = null
+            )
+
+            Spacer(
+                modifier = androidx.compose.ui.Modifier
+                    .width(8.dp)
             )
 
             Text("Manage Accounts")
         }
 
         Card(
-            modifier = Modifier.fillMaxWidth(),
+            modifier = androidx.compose.ui.Modifier
+                .fillMaxWidth(),
             colors = CardDefaults.cardColors(
                 containerColor = VeryLight
             ),
-            shape = RoundedCornerShape(20.dp)
+            shape = androidx.compose.foundation.shape.RoundedCornerShape(
+                20.dp
+            )
         ) {
 
             Column(
-                modifier = Modifier.padding(18.dp)
+                modifier = androidx.compose.ui.Modifier
+                    .padding(18.dp)
             ) {
 
                 Text(
                     "Recent Transactions",
                     color = DeepGreen,
-                    fontWeight = FontWeight.Bold
+                    fontWeight =
+                        androidx.compose.ui.text.font.FontWeight.Bold
                 )
 
                 Spacer(
-                    modifier = Modifier.height(8.dp)
+                    modifier = androidx.compose.ui.Modifier
+                        .height(8.dp)
                 )
 
                 Text(
-                    "No transactions yet",
-                    color = Color.DarkGray
+                    "Open Manage Transactions to view your transaction history.",
+                    color = androidx.compose.ui.graphics.Color.DarkGray
                 )
             }
         }
 
         Spacer(
-            modifier = Modifier.weight(1f)
+            modifier = androidx.compose.ui.Modifier
+                .weight(1f)
         )
 
         Text(
-            text = "Milestone 2 • Accounts",
+            text = "Milestone 3 • Transactions",
             color = LightGreen,
-            modifier = Modifier.align(
-                Alignment.CenterHorizontally
-            )
+            modifier = androidx.compose.ui.Modifier
+                .align(
+                    androidx.compose.ui.Alignment.CenterHorizontally
+                )
         )
     }
+}
+
+@Composable
+fun TransactionsScreen(
+    database: NewayeDatabase,
+    onBack: () -> Unit
+) {
+
+    val repository = remember(database) {
+        TransactionRepository(database)
+    }
+
+    val factory = remember(repository) {
+        TransactionViewModelFactory(
+            repository
+        )
+    }
+
+    val transactionViewModel: TransactionViewModel =
+        viewModel(
+            factory = factory
+        )
+
+    val transactions by transactionViewModel
+        .transactions
+        .collectAsStateWithLifecycle()
+
+    val accounts by database
+        .accountDao()
+        .getAllAccounts()
+        .collectAsStateWithLifecycle(
+            initialValue = emptyList()
+        )
+
+    var showAddDialog by remember {
+        mutableStateOf(false)
+    }
+
+    var editingTransaction by remember {
+        mutableStateOf<TransactionEntity?>(null)
+    }
+
+    var deletingTransaction by remember {
+        mutableStateOf<TransactionEntity?>(null)
+    }
+
+    Column(
+        modifier = androidx.compose.ui.Modifier
+            .fillMaxSize()
+            .padding(16.dp)
+    ) {
+
+        Row(
+            modifier = androidx.compose.ui.Modifier
+                .fillMaxWidth(),
+            horizontalArrangement =
+                Arrangement.SpaceBetween
+        ) {
+
+            TextButton(
+                onClick = onBack
+            ) {
+                Text("← Back")
+            }
+
+            Text(
+                "Transactions",
+                style = MaterialTheme.typography
+                    .headlineSmall
+            )
+
+            IconButton(
+                onClick = {
+                    showAddDialog = true
+                }
+            ) {
+
+                Icon(
+                    Icons.Default.Add,
+                    contentDescription =
+                        "Add transaction"
+                )
+            }
+        }
+
+        Spacer(
+            modifier = androidx.compose.ui.Modifier
+                .height(8.dp)
+        )
+
+        if (transactions.isEmpty()) {
+
+            Card(
+                modifier = androidx.compose.ui.Modifier
+                    .fillMaxWidth()
+            ) {
+
+                Column(
+                    modifier = androidx.compose.ui.Modifier
+                        .padding(24.dp),
+                    horizontalAlignment =
+                        androidx.compose.ui.Alignment.CenterHorizontally
+                ) {
+
+                    Icon(
+                        Icons.Default.Payments,
+                        contentDescription = null,
+                        tint = Green
+                    )
+
+                    Spacer(
+                        modifier = androidx.compose.ui.Modifier
+                            .height(12.dp)
+                    )
+
+                    Text(
+                        "No transactions yet",
+                        fontWeight =
+                            androidx.compose.ui.text.font.FontWeight.Bold
+                    )
+
+                    Text(
+                        "Add your first income or expense."
+                    )
+
+                    Spacer(
+                        modifier = androidx.compose.ui.Modifier
+                            .height(12.dp)
+                    )
+
+                    Button(
+                        onClick = {
+                            showAddDialog = true
+                        }
+                    ) {
+                        Text("Add Transaction")
+                    }
+                }
+            }
+
+        } else {
+
+            LazyColumn(
+                verticalArrangement =
+                    Arrangement.spacedBy(10.dp)
+            ) {
+
+                items(
+                    transactions,
+                    key = {
+                        it.id
+                    }
+                ) { transaction ->
+
+                    val accountName =
+                        accounts
+                            .firstOrNull {
+                                it.id ==
+                                    transaction.accountId
+                            }
+                            ?.name
+                            ?: "Unknown account"
+
+                    TransactionCard(
+                        transaction = transaction,
+                        accountName = accountName,
+                        onEdit = {
+                            editingTransaction =
+                                transaction
+                        },
+                        onDelete = {
+                            deletingTransaction =
+                                transaction
+                        }
+                    )
+                }
+            }
+        }
+    }
+
+    if (showAddDialog) {
+
+        TransactionDialog(
+            title = "Add Transaction",
+            accounts = accounts,
+            transaction = null,
+            onDismiss = {
+                showAddDialog = false
+            },
+            onSave = { transaction ->
+
+                transactionViewModel
+                    .addTransaction(transaction)
+
+                showAddDialog = false
+            }
+        )
+    }
+
+    editingTransaction?.let { transaction ->
+
+        TransactionDialog(
+            title = "Edit Transaction",
+            accounts = accounts,
+            transaction = transaction,
+            onDismiss = {
+                editingTransaction = null
+            },
+            onSave = { updated ->
+
+                transactionViewModel
+                    .updateTransaction(updated)
+
+                editingTransaction = null
+            }
+        )
+    }
+
+    deletingTransaction?.let { transaction ->
+
+        AlertDialog(
+            onDismissRequest = {
+                deletingTransaction = null
+            },
+            title = {
+                Text("Delete Transaction?")
+            },
+            text = {
+                Text(
+                    "This will remove the transaction and restore the affected account balance."
+                )
+            },
+            confirmButton = {
+
+                TextButton(
+                    onClick = {
+
+                        transactionViewModel
+                            .deleteTransaction(
+                                transaction
+                            )
+
+                        deletingTransaction = null
+                    }
+                ) {
+                    Text("Delete")
+                }
+            },
+            dismissButton = {
+
+                TextButton(
+                    onClick = {
+                        deletingTransaction = null
+                    }
+                ) {
+                    Text("Cancel")
+                }
+            }
+        )
+    }
+}
+
+@Composable
+fun TransactionCard(
+    transaction: TransactionEntity,
+    accountName: String,
+    onEdit: () -> Unit,
+    onDelete: () -> Unit
+) {
+
+    val isIncome =
+        transaction.type == "INCOME"
+
+    Card(
+        modifier = androidx.compose.ui.Modifier
+            .fillMaxWidth()
+    ) {
+
+        Row(
+            modifier = androidx.compose.ui.Modifier
+                .fillMaxWidth()
+                .padding(14.dp),
+            verticalAlignment =
+                androidx.compose.ui.Alignment.CenterVertically
+        ) {
+
+            Icon(
+                imageVector =
+                    if (isIncome) {
+                        Icons.Default.ArrowUpward
+                    } else {
+                        Icons.Default.ArrowDownward
+                    },
+                contentDescription = null,
+                tint =
+                    if (isIncome) {
+                        Green
+                    } else {
+                        DeepGreen
+                    }
+            )
+
+            Spacer(
+                modifier = androidx.compose.ui.Modifier
+                    .width(12.dp)
+            )
+
+            Column(
+                modifier = androidx.compose.ui.Modifier
+                    .weight(1f)
+            ) {
+
+                Text(
+                    transaction.category,
+                    fontWeight =
+                        androidx.compose.ui.text.font.FontWeight.Bold
+                )
+
+                Text(
+                    accountName,
+                    color = androidx.compose.ui.graphics.Color.Gray
+                )
+
+                if (transaction.note.isNotBlank()) {
+
+                    Text(
+                        transaction.note,
+                        color =
+                            androidx.compose.ui.graphics.Color.Gray
+                    )
+                }
+
+                Text(
+                    formatTransactionDate(
+                        transaction.date
+                    ),
+                    color =
+                        androidx.compose.ui.graphics.Color.Gray
+                )
+            }
+
+            Column(
+                horizontalAlignment =
+                    androidx.compose.ui.Alignment.End
+            ) {
+
+                Text(
+                    "${if (isIncome) "+" else "-"} ETB ${
+                        "%.2f".format(
+                            transaction.amount
+                        )
+                    }",
+                    fontWeight =
+                        androidx.compose.ui.text.font.FontWeight.Bold,
+                    color =
+                        if (isIncome) {
+                            Green
+                        } else {
+                            DeepGreen
+                        }
+                )
+
+                Row {
+
+                    IconButton(
+                        onClick = onEdit
+                    ) {
+                        Icon(
+                            Icons.Default.Edit,
+                            contentDescription =
+                                "Edit"
+                        )
+                    }
+
+                    IconButton(
+                        onClick = onDelete
+                    ) {
+                        Icon(
+                            Icons.Default.Delete,
+                            contentDescription =
+                                "Delete"
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun TransactionDialog(
+    title: String,
+    accounts: List<AccountEntity>,
+    transaction: TransactionEntity?,
+    onDismiss: () -> Unit,
+    onSave: (TransactionEntity) -> Unit
+) {
+
+    var type by remember(
+        transaction?.id
+    ) {
+        mutableStateOf(
+            transaction?.type ?: "EXPENSE"
+        )
+    }
+
+    var selectedAccount by remember(
+        transaction?.id,
+        accounts
+    ) {
+        mutableStateOf(
+            accounts.firstOrNull {
+                it.id ==
+                    transaction?.accountId
+            } ?: accounts.firstOrNull()
+        )
+    }
+
+    var amountText by remember(
+        transaction?.id
+    ) {
+        mutableStateOf(
+            transaction?.amount?.toString() ?: ""
+        )
+    }
+
+    var category by remember(
+        transaction?.id
+    ) {
+        mutableStateOf(
+            transaction?.category ?: ""
+        )
+    }
+
+    var note by remember(
+        transaction?.id
+    ) {
+        mutableStateOf(
+            transaction?.note ?: ""
+        )
+    }
+
+    var accountMenuExpanded by remember {
+        mutableStateOf(false)
+    }
+
+    val categories =
+        if (type == "INCOME") {
+
+            listOf(
+                "Salary",
+                "Business",
+                "Gift",
+                "Interest",
+                "Other Income"
+            )
+
+        } else {
+
+            listOf(
+                "Food",
+                "Transport",
+                "Rent",
+                "Utilities",
+                "Shopping",
+                "Education",
+                "Health",
+                "Other Expense"
+            )
+        }
+
+    var categoryMenuExpanded by remember {
+        mutableStateOf(false)
+    }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+
+        title = {
+            Text(title)
+        },
+
+        text = {
+
+            Column(
+                verticalArrangement =
+                    Arrangement.spacedBy(10.dp)
+            ) {
+
+                Row(
+                    horizontalArrangement =
+                        Arrangement.spacedBy(8.dp)
+                ) {
+
+                    OutlinedButton(
+                        onClick = {
+                            type = "INCOME"
+                            category = ""
+                        },
+                        modifier =
+                            androidx.compose.ui.Modifier
+                                .weight(1f)
+                    ) {
+                        Text("Income")
+                    }
+
+                    OutlinedButton(
+                        onClick = {
+                            type = "EXPENSE"
+                            category = ""
+                        },
+                        modifier =
+                            androidx.compose.ui.Modifier
+                                .weight(1f)
+                    ) {
+                        Text("Expense")
+                    }
+                }
+
+                Text(
+                    "Account",
+                    fontWeight =
+                        androidx.compose.ui.text.font.FontWeight.Bold
+                )
+
+                androidx.compose.material3.ExposedDropdownMenuBox(
+                    expanded = accountMenuExpanded,
+                    onExpandedChange = {
+                        accountMenuExpanded =
+                            !accountMenuExpanded
+                    }
+                ) {
+
+                    OutlinedTextField(
+                        value =
+                            selectedAccount?.name
+                                ?: "No account",
+                        onValueChange = {},
+                        readOnly = true,
+                        modifier =
+                            androidx.compose.ui.Modifier
+                                .fillMaxWidth()
+                                .menuAnchor(),
+                        label = {
+                            Text("Account")
+                        }
+                    )
+
+                    DropdownMenu(
+                        expanded = accountMenuExpanded,
+                        onDismissRequest = {
+                            accountMenuExpanded =
+                                false
+                        }
+                    ) {
+
+                        accounts.forEach { account ->
+
+                            DropdownMenuItem(
+                                text = {
+                                    Text(
+                                        "${account.name} • ${account.type}"
+                                    )
+                                },
+                                onClick = {
+
+                                    selectedAccount =
+                                        account
+
+                                    accountMenuExpanded =
+                                        false
+                                }
+                            )
+                        }
+                    }
+                }
+
+                OutlinedTextField(
+                    value = amountText,
+                    onValueChange = {
+                        amountText = it
+                    },
+                    label = {
+                        Text("Amount (ETB)")
+                    },
+                    singleLine = true,
+                    modifier =
+                        androidx.compose.ui.Modifier
+                            .fillMaxWidth()
+                )
+
+                androidx.compose.material3.ExposedDropdownMenuBox(
+                    expanded = categoryMenuExpanded,
+                    onExpandedChange = {
+                        categoryMenuExpanded =
+                            !categoryMenuExpanded
+                    }
+                ) {
+
+                    OutlinedTextField(
+                        value = category,
+                        onValueChange = {
+                            category = it
+                        },
+                        label = {
+                            Text("Category")
+                        },
+                        modifier =
+                            androidx.compose.ui.Modifier
+                                .fillMaxWidth()
+                                .menuAnchor()
+                    )
+
+                    DropdownMenu(
+                        expanded =
+                            categoryMenuExpanded,
+                        onDismissRequest = {
+                            categoryMenuExpanded =
+                                false
+                        }
+                    ) {
+
+                        categories.forEach { item ->
+
+                            DropdownMenuItem(
+                                text = {
+                                    Text(item)
+                                },
+                                onClick = {
+
+                                    category =
+                                        item
+
+                                    categoryMenuExpanded =
+                                        false
+                                }
+                            )
+                        }
+                    }
+                }
+
+                OutlinedTextField(
+                    value = note,
+                    onValueChange = {
+                        note = it
+                    },
+                    label = {
+                        Text("Note")
+                    },
+                    modifier =
+                        androidx.compose.ui.Modifier
+                            .fillMaxWidth(),
+                    minLines = 2
+                )
+            }
+        },
+
+        confirmButton = {
+
+            TextButton(
+                onClick = {
+
+                    val amount =
+                        amountText
+                            .toDoubleOrNull()
+
+                    if (
+                        amount != null &&
+                        amount > 0 &&
+                        selectedAccount != null &&
+                        category.isNotBlank()
+                    ) {
+
+                        onSave(
+                            TransactionEntity(
+                                id =
+                                    transaction?.id
+                                        ?: 0,
+
+                                accountId =
+                                    selectedAccount!!.id,
+
+                                type = type,
+
+                                amount =
+                                    abs(amount),
+
+                                category =
+                                    category.trim(),
+
+                                note =
+                                    note.trim(),
+
+                                date =
+                                    transaction?.date
+                                        ?: System.currentTimeMillis(),
+
+                                currency = "ETB"
+                            )
+                        )
+                    }
+                }
+            ) {
+                Text("Save")
+            }
+        },
+
+        dismissButton = {
+
+            TextButton(
+                onClick = onDismiss
+            ) {
+                Text("Cancel")
+            }
+        }
+    )
 }
 
 @Composable
@@ -316,218 +1141,108 @@ fun AccountsScreen(
             initialValue = emptyList()
         )
 
-    var showAddAccount by remember {
+    var showDialog by remember {
         mutableStateOf(false)
     }
-
+val scope = rememberCoroutineScope()
     Column(
-        modifier = Modifier
+        modifier = androidx.compose.ui.Modifier
             .fillMaxSize()
             .padding(20.dp)
     ) {
 
         Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically
+            modifier = androidx.compose.ui.Modifier
+                .fillMaxWidth(),
+            horizontalArrangement =
+                Arrangement.SpaceBetween
         ) {
 
-            IconButton(
+            TextButton(
                 onClick = onBack
             ) {
-
-                Icon(
-                    imageVector = Icons.Default.ArrowBack,
-                    contentDescription = "Back"
-                )
+                Text("← Back")
             }
 
             Text(
-                text = "Accounts",
-                color = DeepGreen,
-                fontSize = 28.sp,
-                fontWeight = FontWeight.Bold
+                "Accounts",
+                style = MaterialTheme.typography
+                    .headlineSmall
             )
+
+            IconButton(
+                onClick = {
+                    showDialog = true
+                }
+            ) {
+
+                Icon(
+                    Icons.Default.Add,
+                    contentDescription =
+                        "Add account"
+                )
+            }
         }
 
         Spacer(
-            modifier = Modifier.height(12.dp)
+            modifier = androidx.compose.ui.Modifier
+                .height(12.dp)
         )
 
         if (accounts.isEmpty()) {
 
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .weight(1f),
-
-                horizontalAlignment =
-                    Alignment.CenterHorizontally,
-
-                verticalArrangement =
-                    Arrangement.Center
-            ) {
-
-                Icon(
-                    imageVector =
-                        Icons.Default.AccountBalanceWallet,
-
-                    contentDescription = null,
-
-                    tint = LightGreen,
-
-                    modifier = Modifier.size(64.dp)
-                )
-
-                Spacer(
-                    modifier = Modifier.height(12.dp)
-                )
-
-                Text(
-                    "No accounts yet",
-                    fontSize = 20.sp,
-                    fontWeight = FontWeight.Bold
-                )
-
-                Text(
-                    "Add your first money account."
-                )
-            }
+            Text("No accounts yet.")
 
         } else {
 
             LazyColumn(
-                modifier = Modifier.weight(1f),
                 verticalArrangement =
-                    Arrangement.spacedBy(12.dp)
+                    Arrangement.spacedBy(10.dp)
             ) {
 
                 items(
-                    items = accounts,
-                    key = { it.id }
+                    accounts,
+                    key = {
+                        it.id
+                    }
                 ) { account ->
 
-                    AccountCard(account)
+                    AccountCard(
+                        account
+                    )
                 }
             }
         }
-
-        Spacer(
-            modifier = Modifier.height(12.dp)
-        )
-
-        Button(
-            onClick = {
-                showAddAccount = true
-            },
-
-            modifier = Modifier.fillMaxWidth(),
-
-            shape = RoundedCornerShape(18.dp)
-        ) {
-
-            Icon(
-                imageVector = Icons.Default.Add,
-                contentDescription = null
-            )
-
-            Spacer(
-                modifier = Modifier.width(8.dp)
-            )
-
-            Text("Add Account")
-        }
     }
 
-    if (showAddAccount) {
+    if (showDialog) {
 
         AddAccountDialog(
-            database = database,
-
             onDismiss = {
-                showAddAccount = false
+                showDialog = false
+            },
+            onSave = { account ->
+
+                androidx.compose.runtime.rememberCoroutineScope()
+                    .launch {
+                        database
+                            .accountDao()
+                            .insertAccount(
+                                account
+                            )
+                    }
+
+                showDialog = false
             }
         )
-    }
-}
-
-@Composable
-fun AccountCard(
-    account: AccountEntity
-) {
-
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(20.dp)
-    ) {
-
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(18.dp),
-
-            verticalAlignment =
-                Alignment.CenterVertically
-        ) {
-
-            Icon(
-                imageVector = when (account.type) {
-
-                    "Cash" ->
-                        Icons.Default.Payments
-
-                    "Bank" ->
-                        Icons.Default.AccountBalance
-
-                    "Mobile Wallet" ->
-                        Icons.Default.PhoneAndroid
-
-                    else ->
-                        Icons.Default.AccountBalanceWallet
-                },
-
-                contentDescription = null,
-
-                tint = Green,
-
-                modifier = Modifier.size(36.dp)
-            )
-
-            Spacer(
-                modifier = Modifier.width(14.dp)
-            )
-
-            Column(
-                modifier = Modifier.weight(1f)
-            ) {
-
-                Text(
-                    account.name,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 18.sp
-                )
-
-                Text(
-                    account.type,
-                    color = Color.Gray
-                )
-            }
-
-            Text(
-                "ETB %.2f".format(account.balance),
-                fontWeight = FontWeight.Bold,
-                color = DeepGreen
-            )
-        }
     }
 }
 
 @Composable
 fun AddAccountDialog(
-    database: NewayeDatabase,
-    onDismiss: () -> Unit
+    onDismiss: () -> Unit,
+    onSave: (AccountEntity) -> Unit
 ) {
-
-    val scope = rememberCoroutineScope()
 
     var name by remember {
         mutableStateOf("")
@@ -542,7 +1257,6 @@ fun AddAccountDialog(
     }
 
     AlertDialog(
-
         onDismissRequest = onDismiss,
 
         title = {
@@ -553,66 +1267,46 @@ fun AddAccountDialog(
 
             Column(
                 verticalArrangement =
-                    Arrangement.spacedBy(12.dp)
+                    Arrangement.spacedBy(10.dp)
             ) {
 
                 OutlinedTextField(
                     value = name,
-
                     onValueChange = {
                         name = it
                     },
-
                     label = {
-                        Text("Account name")
+                        Text("Account Name")
                     },
-
-                    singleLine = true
+                    modifier =
+                        androidx.compose.ui.Modifier
+                            .fillMaxWidth()
                 )
 
-                Text(
-                    "Account type",
-                    fontWeight = FontWeight.Bold
+                OutlinedTextField(
+                    value = type,
+                    onValueChange = {
+                        type = it
+                    },
+                    label = {
+                        Text("Type")
+                    },
+                    modifier =
+                        androidx.compose.ui.Modifier
+                            .fillMaxWidth()
                 )
-
-                Row(
-                    horizontalArrangement =
-                        Arrangement.spacedBy(8.dp)
-                ) {
-
-                    listOf(
-                        "Cash",
-                        "Bank",
-                        "Mobile Wallet"
-                    ).forEach { option ->
-
-                        FilterChip(
-                            selected =
-                                type == option,
-
-                            onClick = {
-                                type = option
-                            },
-
-                            label = {
-                                Text(option)
-                            }
-                        )
-                    }
-                }
 
                 OutlinedTextField(
                     value = balance,
-
                     onValueChange = {
                         balance = it
                     },
-
                     label = {
-                        Text("Opening balance")
+                        Text("Opening Balance (ETB)")
                     },
-
-                    singleLine = true
+                    modifier =
+                        androidx.compose.ui.Modifier
+                            .fillMaxWidth()
                 )
             }
         },
@@ -620,34 +1314,30 @@ fun AddAccountDialog(
         confirmButton = {
 
             TextButton(
-
-                enabled =
-                    name.isNotBlank(),
-
                 onClick = {
 
-                    val amount =
-                        balance.toDoubleOrNull()
+                    val openingBalance =
+                        balance
+                            .toDoubleOrNull()
                             ?: 0.0
 
-                    val account =
-                        AccountEntity(
-                            name = name.trim(),
-                            type = type,
-                            balance = amount
+                    if (name.isNotBlank()) {
+
+                        onSave(
+                            AccountEntity(
+                                name =
+                                    name.trim(),
+
+                                type =
+                                    type.trim(),
+
+                                balance =
+                                    openingBalance
+                            )
                         )
-
-                    scope.launch {
-
-                        database
-                            .accountDao()
-                            .insertAccount(account)
-
-                        onDismiss()
                     }
                 }
             ) {
-
                 Text("Save")
             }
         },
@@ -657,7 +1347,6 @@ fun AddAccountDialog(
             TextButton(
                 onClick = onDismiss
             ) {
-
                 Text("Cancel")
             }
         }
@@ -665,73 +1354,119 @@ fun AddAccountDialog(
 }
 
 @Composable
-fun SmallCard(
-    title: String,
-    amount: String,
-    accent: Color,
-    modifier: Modifier
+fun AccountCard(
+    account: AccountEntity
 ) {
 
     Card(
-        modifier = modifier,
-        shape = RoundedCornerShape(20.dp)
+        modifier = androidx.compose.ui.Modifier
+            .fillMaxWidth()
     ) {
 
-        Column(
-            modifier = Modifier.padding(16.dp)
+        Row(
+            modifier = androidx.compose.ui.Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            verticalAlignment =
+                androidx.compose.ui.Alignment.CenterVertically
         ) {
 
-            Text(
-                title,
-                color = accent,
-                fontWeight = FontWeight.SemiBold
+            Icon(
+                imageVector =
+                    when (account.type) {
+                        "Bank" ->
+                            Icons.Default.AccountBalance
+
+                        "Mobile Wallet" ->
+                            Icons.Default.Wallet
+
+                        else ->
+                            Icons.Default.AccountBalanceWallet
+                    },
+                contentDescription = null,
+                tint = Green
             )
 
             Spacer(
-                modifier = Modifier.height(8.dp)
+                modifier = androidx.compose.ui.Modifier
+                    .width(12.dp)
             )
 
+            Column(
+                modifier =
+                    androidx.compose.ui.Modifier
+                        .weight(1f)
+            ) {
+
+                Text(
+                    account.name,
+                    fontWeight =
+                        androidx.compose.ui.text.font.FontWeight.Bold
+                )
+
+                Text(
+                    account.type,
+                    color =
+                        androidx.compose.ui.graphics.Color.Gray
+                )
+            }
+
             Text(
-                amount,
-                fontWeight = FontWeight.Bold
+                "ETB %.2f".format(
+                    account.balance
+                ),
+                fontWeight =
+                    androidx.compose.ui.text.font.FontWeight.Bold,
+                color = DeepGreen
             )
         }
     }
 }
 
 @Composable
-fun Placeholder(
+fun SmallCard(
     title: String,
-    message: String
+    amount: String,
+    accent: androidx.compose.ui.graphics.Color,
+    modifier: androidx.compose.ui.Modifier
 ) {
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(24.dp),
-
-        horizontalAlignment =
-            Alignment.CenterHorizontally,
-
-        verticalArrangement =
-            Arrangement.Center
+    Card(
+        modifier = modifier,
+        colors = CardDefaults.cardColors(
+            containerColor = VeryLight
+        ),
+        shape =
+            androidx.compose.foundation.shape.RoundedCornerShape(
+                18.dp
+            )
     ) {
 
-        Text(
-            title,
-            color = DeepGreen,
-            fontSize = 28.sp,
-            fontWeight = FontWeight.Bold
-        )
+        Column(
+            modifier =
+                androidx.compose.ui.Modifier
+                    .padding(16.dp)
+        ) {
 
-        Spacer(
-            modifier = Modifier.height(8.dp)
-        )
+            Text(
+                title,
+                color = accent,
+                fontWeight =
+                    androidx.compose.ui.text.font.FontWeight.Bold
+            )
 
-        Text(
-            message,
-            color = Color.Gray
-        )
+            Spacer(
+                modifier =
+                    androidx.compose.ui.Modifier
+                        .height(6.dp)
+            )
+
+            Text(
+                amount,
+                fontWeight =
+                    androidx.compose.ui.text.font.FontWeight.Bold
+            )
+        }
     }
 }
 
@@ -739,65 +1474,58 @@ fun Placeholder(
 fun Settings() {
 
     Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(24.dp)
+        modifier =
+            androidx.compose.ui.Modifier
+                .fillMaxSize()
+                .padding(20.dp)
     ) {
 
         Text(
             "Settings",
-            color = DeepGreen,
-            fontSize = 28.sp,
-            fontWeight = FontWeight.Bold
+            style = MaterialTheme.typography
+                .headlineMedium
         )
 
         Spacer(
-            modifier = Modifier.height(18.dp)
+            modifier =
+                androidx.compose.ui.Modifier
+                    .height(16.dp)
         )
 
         Text(
-            "Language",
-            fontWeight = FontWeight.Bold
-        )
-
-        Text(
-            "English • Amharic foundation ready"
+            "Language: English"
         )
 
         Spacer(
-            modifier = Modifier.height(14.dp)
+            modifier =
+                androidx.compose.ui.Modifier
+                    .height(8.dp)
         )
 
         Text(
-            "Currency",
-            fontWeight = FontWeight.Bold
-        )
-
-        Text(
-            "ETB — Ethiopian Birr"
+            "Currency: ETB"
         )
 
         Spacer(
-            modifier = Modifier.height(14.dp)
+            modifier =
+                androidx.compose.ui.Modifier
+                    .height(8.dp)
         )
 
         Text(
-            "Appearance",
-            fontWeight = FontWeight.Bold
-        )
-
-        Text(
-            "System theme"
-        )
-
-        Spacer(
-            modifier = Modifier.height(20.dp)
-        )
-
-        Text(
-            "ነዋዬ • ገንዘብዎ ፣በእጅዎ",
-            color = Green,
-            fontWeight = FontWeight.Bold
+            "Newaye Finance"
         )
     }
+}
+
+fun formatTransactionDate(
+    timestamp: Long
+): String {
+
+    return SimpleDateFormat(
+        "MMM dd, yyyy HH:mm",
+        Locale.getDefault()
+    ).format(
+        Date(timestamp)
+    )
 }
