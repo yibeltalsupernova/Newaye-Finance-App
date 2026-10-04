@@ -1135,7 +1135,7 @@ fun AccountsScreen(
     database: NewayeDatabase,
     onBack: () -> Unit
 ) {
-
+val scope = rememberCoroutineScope()
     val accounts by database
         .accountDao()
         .getAllAccounts()
