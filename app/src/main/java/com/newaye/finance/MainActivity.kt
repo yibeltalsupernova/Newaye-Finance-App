@@ -1135,7 +1135,8 @@ fun AccountsScreen(
     database: NewayeDatabase,
     onBack: () -> Unit
 ) {
-val scope = rememberCoroutineScope()
+    val scope = rememberCoroutineScope()
+
     val accounts by database
         .accountDao()
         .getAllAccounts()
@@ -1146,7 +1147,7 @@ val scope = rememberCoroutineScope()
     var showDialog by remember {
         mutableStateOf(false)
     }
-val scope = rememberCoroutineScope()
+
     Column(
         modifier = androidx.compose.ui.Modifier
             .fillMaxSize()
@@ -1225,17 +1226,16 @@ val scope = rememberCoroutineScope()
             },
             onSave = { account ->
 
-                androidx.compose.runtime.rememberCoroutineScope()
-                    .launch {
-                        database
-                            .accountDao()
-                            .insertAccount(
-                                account
-                            )
-                    }
+    scope.launch {
+        database
+            .accountDao()
+            .insertAccount(
+                account
+            )
+    }
 
-                showDialog = false
-            }
+    showDialog = false
+}
         )
     }
 }
