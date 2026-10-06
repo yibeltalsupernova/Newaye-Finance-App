@@ -53,7 +53,9 @@ jobs:
       - name: Build Newaye APK
         run: |
           gradle --no-daemon assembleDebug
-
+      - name: Run Milestone 4 unit tests
+        run: |
+          gradle --no-daemon testDebugUnitTest
       - name: Upload Newaye APK
         uses: actions/upload-artifact@v4
         with:
