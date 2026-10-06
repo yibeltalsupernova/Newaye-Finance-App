@@ -1,4 +1,3 @@
-
 package com.newaye.finance.sms
 
 class SmsParserEngine(
@@ -19,10 +18,7 @@ class SmsParserEngine(
             )
         }
 
-        val profile = findProfile(
-            sender = sender,
-            message = normalizedMessage
-        )
+        val profile = findProfile(sender, normalizedMessage)
 
         if (profile == null) {
             return SmsParserResult.NotRecognized(
@@ -32,8 +28,8 @@ class SmsParserEngine(
         }
 
         val type = detectTransactionType(
-            message = normalizedMessage,
-            profile = profile
+            normalizedMessage,
+            profile
         )
 
         if (type == null) {
@@ -44,8 +40,8 @@ class SmsParserEngine(
         }
 
         val amount = extractAmount(
-            message = normalizedMessage,
-            profile = profile
+            normalizedMessage,
+            profile
         )
 
         if (amount == null || amount <= 0.0) {
@@ -56,18 +52,18 @@ class SmsParserEngine(
         }
 
         val reference = extractReference(
-            message = normalizedMessage,
-            profile = profile
+            normalizedMessage,
+            profile
         )
 
         val accountHint = extractAccountHint(
-            message = normalizedMessage,
-            profile = profile
+            normalizedMessage,
+            profile
         )
 
         val categoryHint = detectCategory(
-            message = normalizedMessage,
-            profile = profile
+            normalizedMessage,
+            profile
         )
 
         val confidence = calculateConfidence(
@@ -78,21 +74,19 @@ class SmsParserEngine(
             accountHint = accountHint
         )
 
-        val transaction = ParsedSmsTransaction(
-            type = type,
-            amount = amount,
-            currency = "ETB",
-            sender = sender,
-            accountHint = accountHint,
-            categoryHint = categoryHint,
-            reference = reference,
-            note = message.trim(),
-            confidence = confidence,
-            rawMessage = message
-        )
-
         return SmsParserResult.Success(
-            transaction = transaction
+            ParsedSmsTransaction(
+                type = type,
+                amount = amount,
+                currency = "ETB",
+                sender = sender,
+                accountHint = accountHint,
+                categoryHint = categoryHint,
+                reference = reference,
+                note = message.trim(),
+                confidence = confidence,
+                rawMessage = message
+            )
         )
     }
 
@@ -129,7 +123,7 @@ class SmsParserEngine(
         profile: SmsParserProfile
     ): String? {
 
-        val isIncome =
+        val income =
             profile.incomeKeywords.any { keyword ->
                 message.contains(
                     keyword,
@@ -137,7 +131,7 @@ class SmsParserEngine(
                 )
             }
 
-        val isExpense =
+        val expense =
             profile.expenseKeywords.any { keyword ->
                 message.contains(
                     keyword,
@@ -146,8 +140,8 @@ class SmsParserEngine(
             }
 
         return when {
-            isIncome && !isExpense -> "INCOME"
-            isExpense && !isIncome -> "EXPENSE"
+            income && !expense -> "INCOME"
+            expense && !income -> "EXPENSE"
             else -> null
         }
     }
@@ -162,20 +156,27 @@ class SmsParserEngine(
             val match = pattern.find(message)
                 ?: continue
 
-            val amountText =
-                match.groups
-                    .getOrNull(1)
-                    ?.value
-                    ?: match.value
+            val text = match.value
+                .replace(
+                    "ETB",
+                    "",
+                    ignoreCase = true
+                )
+                .replace(
+                    "Birr",
+                    "",
+                    ignoreCase = true
+                )
+                .replace(",", "")
+                .trim()
 
-            val cleaned =
-                amountText
-                    .replace(",", "")
-                    .replace("ETB", "", ignoreCase = true)
-                    .trim()
+            val number =
+                Regex(
+                    """[0-9]+(?:\.[0-9]+)?"""
+                ).find(text)?.value
 
             val amount =
-                cleaned.toDoubleOrNull()
+                number?.toDoubleOrNull()
 
             if (amount != null) {
                 return amount
@@ -195,12 +196,22 @@ class SmsParserEngine(
             val match = pattern.find(message)
                 ?: continue
 
-            return (
-                match.groups
-                    .getOrNull(1)
-                    ?.value
-                    ?: match.value
-                ).trim()
+            val text = match.value
+
+            val separator =
+                Regex(
+                    """[:#-]"""
+                ).find(text)
+
+            if (separator != null) {
+                return text
+                    .substring(
+                        separator.range.last + 1
+                    )
+                    .trim()
+            }
+
+            return text.trim()
         }
 
         return null
@@ -216,12 +227,23 @@ class SmsParserEngine(
             val match = pattern.find(message)
                 ?: continue
 
-            return (
-                match.groups
-                    .getOrNull(1)
-                    ?.value
-                    ?: match.value
-                ).trim()
+            val text = match.value
+
+            val separator =
+                Regex(
+                    """[:#-]"""
+                ).find(text)
+
+            if (separator != null) {
+                return text
+                    .substring(
+                        separator.range.last + 1
+                    )
+                    .trim()
+                    .removeSuffix(".")
+            }
+
+            return text.trim()
         }
 
         return null
@@ -234,7 +256,7 @@ class SmsParserEngine(
 
         for ((category, keywords) in profile.categoryKeywords) {
 
-            val matches =
+            val found =
                 keywords.any { keyword ->
                     message.contains(
                         keyword,
@@ -242,7 +264,7 @@ class SmsParserEngine(
                     )
                 }
 
-            if (matches) {
+            if (found) {
                 return category
             }
         }
@@ -264,11 +286,17 @@ class SmsParserEngine(
             score += 0.15
         }
 
-        if (type == "INCOME" || type == "EXPENSE") {
+        if (
+            type == "INCOME" ||
+            type == "EXPENSE"
+        ) {
             score += 0.35
         }
 
-        if (amount != null && amount > 0.0) {
+        if (
+            amount != null &&
+            amount > 0.0
+        ) {
             score += 0.30
         }
 
@@ -288,8 +316,14 @@ class SmsParserEngine(
     ): String {
 
         return message
-            .replace("\u00A0", " ")
-            .replace(Regex("\\s+"), " ")
+            .replace(
+                "\u00A0",
+                " "
+            )
+            .replace(
+                Regex("\\s+"),
+                " "
+            )
             .trim()
     }
 }
