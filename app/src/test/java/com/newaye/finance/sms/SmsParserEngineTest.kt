@@ -7,11 +7,12 @@ import org.junit.Test
 
 class SmsParserEngineTest {
 
-    private val engine = SmsParserEngine(
-        profiles = listOf(
-            DevelopmentSmsProfile.profile
-        )
-    )
+  
+private val engine = SmsParserEngine(
+    profiles = EthiopianSmsProfiles.all +
+        DevelopmentSmsProfile.profile
+)
+
 
     @Test
     fun parsesIncomeSms() {
@@ -143,4 +144,71 @@ class SmsParserEngineTest {
             0.01
         )
     }
+    
+@Test
+fun parsesTelebirrPackagePurchase() {
+    val result = engine.parse(
+        sender = "127",
+        message = "Dear Customer. You have paid ETB 25.00 for package Voice Weekly. Your transaction number is DJC2PTRK1U. Your current balance is ETB 22.08. Thank you for using telebirr Ethio telecom."
+    )
+
+    assertTrue(
+        "Expected Success but got: $result",
+        result is SmsParserResult.Success
+    )
+
+    val transaction =
+        (result as SmsParserResult.Success).transaction
+
+    assertEquals("EXPENSE", transaction.type)
+    assertEquals(25.0, transaction.amount, 0.01)
+    assertEquals("DJC2PTRK1U", transaction.reference)
+    assertEquals("Mobile Package", transaction.categoryHint)
+}
+
+@Test
+fun parsesCbeTransferWithoutConfusingFeesOrBalance() {
+    val result = engine.parse(
+        sender = "CBE",
+        message = "Dear Customer. You have successfully transferred ETB550.00 from account 1*********9164 to account 1*********8111. Service charge of ETB 0.50 and VAT(15%) of ETB0.08 and Disaster Recovery(5%) of 0.03 with total of ETB550.61. Your current balance is ETB1,066.23. Thanks for Banking with CBE."
+    )
+
+    assertTrue(
+        "Expected Success but got: $result",
+        result is SmsParserResult.Success
+    )
+
+    val transaction =
+        (result as SmsParserResult.Success).transaction
+
+    assertEquals("EXPENSE", transaction.type)
+    assertEquals(550.0, transaction.amount, 0.01)
+    assertEquals("Transfer", transaction.categoryHint)
+    assertTrue(
+        "CBE example should not invent a reference",
+        transaction.reference == null
+    )
+}
+
+@Test
+fun parsesMpesaBundlePurchase() {
+    val result = engine.parse(
+        sender = "MPESA",
+        message = "Dear Customer, you have bought a Safaricom bundle of 5.00 Birr for 251712973146. Transaction number TCQ2QUJ58E. Your current M-PESA balance is 120.97 Birr."
+    )
+
+    assertTrue(
+        "Expected Success but got: $result",
+        result is SmsParserResult.Success
+    )
+
+    val transaction =
+        (result as SmsParserResult.Success).transaction
+
+    assertEquals("EXPENSE", transaction.type)
+    assertEquals(5.0, transaction.amount, 0.01)
+    assertEquals("TCQ2QUJ58E", transaction.reference)
+    assertEquals("Mobile Package", transaction.categoryHint)
+}
+
 }
