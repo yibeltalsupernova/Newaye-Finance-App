@@ -1,3 +1,4 @@
+import org.gradle.api.tasks.testing.Test
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.plugin.compose")
@@ -90,4 +91,7 @@ implementation(
         "androidx.room:room-compiler:$roomVersion"
     )
 testImplementation("junit:junit:4.13.2")
+}
+tasks.withType<Test>().configureEach {
+    useJUnit()
 }
