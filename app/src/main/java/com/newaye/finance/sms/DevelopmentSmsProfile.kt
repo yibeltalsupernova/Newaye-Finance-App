@@ -20,13 +20,14 @@ object DevelopmentSmsProfile {
                 "income"
             ),
 
+           
             expenseKeywords = listOf(
-                "debited",
-                "spent",
-                "withdrawn",
-                "payment",
-                "purchase"
+            "debited",
+            "spent",
+            "withdrawn",
+            "purchase"
             ),
+
 
             amountPatterns = listOf(
 
