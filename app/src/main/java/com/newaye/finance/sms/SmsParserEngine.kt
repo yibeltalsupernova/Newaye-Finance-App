@@ -146,45 +146,30 @@ class SmsParserEngine(
         }
     }
 
-    private fun extractAmount(
-        message: String,
-        profile: SmsParserProfile
-    ): Double? {
+ 
+private fun extractAmount(
+    message: String,
+    profile: SmsParserProfile
+): Double? {
 
-        for (pattern in profile.amountPatterns) {
+    for (pattern in profile.amountPatterns) {
+        val match = pattern.find(message) ?: continue
 
-            val match = pattern.find(message)
-                ?: continue
+        val cleaned = match.value
+            .replace("ETB", "", ignoreCase = true)
+            .replace("Birr", "", ignoreCase = true)
+            .replace(",", "")
+            .trim()
 
-            val text = match.value
-                .replace(
-                    "ETB",
-                    "",
-                    ignoreCase = true
-                )
-                .replace(
-                    "Birr",
-                    "",
-                    ignoreCase = true
-                )
-                .replace(",", "")
-                .trim()
+        val amount = cleaned.toDoubleOrNull()
 
-            val number =
-                Regex(
-                    """[0-9]+(?:\.[0-9]+)?"""
-                ).find(text)?.value
-
-            val amount =
-                number?.toDoubleOrNull()
-
-            if (amount != null) {
-                return amount
-            }
+        if (amount != null && amount > 0.0) {
+            return amount
         }
-
-        return null
     }
+
+    return null
+}
 
     private fun extractReference(
         message: String,
