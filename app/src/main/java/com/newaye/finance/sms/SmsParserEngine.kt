@@ -171,68 +171,54 @@ private fun extractAmount(
     return null
 }
 
-    private fun extractReference(
-        message: String,
-        profile: SmsParserProfile
-    ): String? {
+   
+private fun extractReference(
+    message: String,
+    profile: SmsParserProfile
+): String? {
+    for (pattern in profile.referencePatterns) {
+        val match = pattern.find(message)
+            ?: continue
 
-        for (pattern in profile.referencePatterns) {
+        // Return the first capture group when one exists.
+        if (match.groupValues.size > 1) {
+            val captured = match.groupValues[1].trim()
 
-            val match = pattern.find(message)
-                ?: continue
-
-            val text = match.value
-
-            val separator =
-                Regex(
-                    """[:#-]"""
-                ).find(text)
-
-            if (separator != null) {
-                return text
-                    .substring(
-                        separator.range.last + 1
-                    )
-                    .trim()
+            if (captured.isNotBlank()) {
+                return captured
             }
-
-            return text.trim()
         }
 
-        return null
+        // Safe fallback for patterns without capture groups.
+        return match.value.trim()
     }
 
-    private fun extractAccountHint(
-        message: String,
-        profile: SmsParserProfile
-    ): String? {
+    return null
+}
 
-        for (pattern in profile.accountPatterns) {
+    
+private fun extractAccountHint(
+    message: String,
+    profile: SmsParserProfile
+): String? {
+    for (pattern in profile.accountPatterns) {
+        val match = pattern.find(message)
+            ?: continue
 
-            val match = pattern.find(message)
-                ?: continue
+        if (match.groupValues.size > 1) {
+            val captured = match.groupValues[1].trim()
 
-            val text = match.value
-
-            val separator =
-                Regex(
-                    """[:#-]"""
-                ).find(text)
-
-            if (separator != null) {
-                return text
-                    .substring(
-                        separator.range.last + 1
-                    )
-                    .trim()
-                    .removeSuffix(".")
+            if (captured.isNotBlank()) {
+                return captured
             }
-
-            return text.trim()
         }
 
-        return null
+        return match.value.trim()
     }
+
+    return null
+}
+
 
     private fun detectCategory(
         message: String,
