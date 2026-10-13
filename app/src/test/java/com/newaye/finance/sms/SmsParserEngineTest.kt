@@ -185,8 +185,8 @@ fun parsesCbeTransferWithoutConfusingFeesOrBalance() {
     assertEquals(550.0, transaction.amount, 0.01)
     assertEquals("Transfer", transaction.categoryHint)
     assertEquals("CBE transfer amount", 550.0, transaction.amount, 0.01)
-    assertEquals("CBE fee amount", 0.61, transaction.feeAmount!!, 0.01)
-    assertEquals("CBE total deduction", 550.61, transaction.totalDeducted!!, 0.01)
+    assertEquals("CBE fee amount", 0.61, transaction.feeAmount ?: -1.0, 0.01)
+    assertEquals("CBE total deduction", 550.61, transaction.totalDeducted ?: -1.0, 0.01)
     assertTrue(
         "CBE example should not invent a reference",
         transaction.reference == null
@@ -245,8 +245,8 @@ fun doesNotTreatCbeBalanceAsTransferAmount() {
     )
     val transaction = (result as SmsParserResult.Success).transaction
     assertEquals(550.0, transaction.amount, 0.01)
-    assertEquals(550.61, transaction.totalDeducted!!, 0.01)
-    assertEquals(0.61, transaction.feeAmount!!, 0.01)
+    assertEquals("Expected total deduction to be parsed", 550.61, transaction.totalDeducted ?: -1.0, 0.01)
+    assertEquals("Expected fees to be derived from total deduction", 0.61, transaction.feeAmount ?: -1.0, 0.01)
 }
 
 }
