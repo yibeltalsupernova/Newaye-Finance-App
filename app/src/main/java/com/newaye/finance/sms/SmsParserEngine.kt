@@ -51,9 +51,9 @@ class SmsParserEngine(
             )
         }
 
-        val totalDeducted = extractAmountFromPatterns(
+        val totalDeducted = extractTotalDeducted(
             normalizedMessage,
-            profile.totalAmountPatterns
+            profile
         )
         val explicitFeeAmount = extractFeeAmount(
             normalizedMessage,
@@ -189,6 +189,29 @@ private fun extractAmountFromPatterns(
         if (amount != null && amount > 0.0) return amount
     }
     return null
+}
+
+
+private fun extractTotalDeducted(
+    message: String,
+    profile: SmsParserProfile
+): Double? {
+    // First use provider-specific patterns, then a cautious generic fallback.
+    val configured = extractAmountFromPatterns(
+        message,
+        profile.totalAmountPatterns
+    )
+    if (configured != null) return configured
+
+    val genericTotalPattern = Regex(
+        """\btotal\s+(?:of\s+)?(?:ETB|Birr)\s*([0-9]+(?:,[0-9]{3})*(?:\.[0-9]+)?)""",
+        RegexOption.IGNORE_CASE
+    )
+    val match = genericTotalPattern.find(message) ?: return null
+    return match.groupValues.getOrNull(1)
+        ?.replace(",", "")
+        ?.toDoubleOrNull()
+        ?.takeIf { it > 0.0 }
 }
 
 private fun extractFeeAmount(
