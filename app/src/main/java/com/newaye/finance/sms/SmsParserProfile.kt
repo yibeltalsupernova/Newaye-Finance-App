@@ -13,6 +13,10 @@ data class SmsParserProfile(
 
     val amountPatterns: List<Regex> = emptyList(),
 
+    // Optional patterns used to separate a transaction's main amount from fees.
+    val feePatterns: List<Regex> = emptyList(),
+    val totalAmountPatterns: List<Regex> = emptyList(),
+
     val referencePatterns: List<Regex> = emptyList(),
 
     val accountPatterns: List<Regex> = emptyList(),

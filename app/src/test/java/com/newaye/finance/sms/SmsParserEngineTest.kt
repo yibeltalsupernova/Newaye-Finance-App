@@ -184,6 +184,9 @@ fun parsesCbeTransferWithoutConfusingFeesOrBalance() {
     assertEquals("EXPENSE", transaction.type)
     assertEquals(550.0, transaction.amount, 0.01)
     assertEquals("Transfer", transaction.categoryHint)
+    assertEquals("CBE transfer amount", 550.0, transaction.amount, 0.01)
+    assertEquals("CBE fee amount", 0.61, transaction.feeAmount!!, 0.01)
+    assertEquals("CBE total deduction", 550.61, transaction.totalDeducted!!, 0.01)
     assertTrue(
         "CBE example should not invent a reference",
         transaction.reference == null
@@ -209,6 +212,41 @@ fun parsesMpesaBundlePurchase() {
     assertEquals(5.0, transaction.amount, 0.01)
     assertEquals("TCQ2QUJ58E", transaction.reference)
     assertEquals("Mobile Package", transaction.categoryHint)
+}
+
+
+@Test
+fun parsesCbeIncomingTransfer() {
+    val result = engine.parse(
+        sender = "CBE",
+        message = "Dear Customer, your account has been credited ETB 1,250.00. Current balance ETB 4,500.00. Thanks for Banking with CBE."
+    )
+
+    assertTrue(
+        "Expected Success but got: $result",
+        result is SmsParserResult.Success
+    )
+    val transaction = (result as SmsParserResult.Success).transaction
+    assertEquals("INCOME", transaction.type)
+    assertEquals(1250.0, transaction.amount, 0.01)
+    assertEquals(null, transaction.feeAmount)
+}
+
+@Test
+fun doesNotTreatCbeBalanceAsTransferAmount() {
+    val result = engine.parse(
+        sender = "CBE",
+        message = "You have successfully transferred ETB550.00. Total of ETB550.61. Your current balance is ETB1,066.23. Thanks for Banking with CBE."
+    )
+
+    assertTrue(
+        "Expected Success but got: $result",
+        result is SmsParserResult.Success
+    )
+    val transaction = (result as SmsParserResult.Success).transaction
+    assertEquals(550.0, transaction.amount, 0.01)
+    assertEquals(550.61, transaction.totalDeducted!!, 0.01)
+    assertEquals(0.61, transaction.feeAmount!!, 0.01)
 }
 
 }

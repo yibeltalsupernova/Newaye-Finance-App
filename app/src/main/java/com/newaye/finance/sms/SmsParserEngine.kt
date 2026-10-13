@@ -51,6 +51,21 @@ class SmsParserEngine(
             )
         }
 
+        val totalDeducted = extractAmountFromPatterns(
+            normalizedMessage,
+            profile.totalAmountPatterns
+        )
+        val explicitFeeAmount = extractFeeAmount(
+            normalizedMessage,
+            profile
+        )
+        val feeAmount = when {
+            totalDeducted != null && totalDeducted >= amount ->
+                (totalDeducted - amount).coerceAtLeast(0.0)
+            explicitFeeAmount != null -> explicitFeeAmount
+            else -> null
+        }
+
         val reference = extractReference(
             normalizedMessage,
             profile
@@ -79,6 +94,8 @@ class SmsParserEngine(
                 type = type,
                 amount = amount,
                 currency = "ETB",
+                feeAmount = feeAmount,
+                totalDeducted = totalDeducted ?: (feeAmount?.let { amount + it }),
                 sender = sender,
                 accountHint = accountHint,
                 categoryHint = categoryHint,
@@ -151,27 +168,50 @@ private fun extractAmount(
     message: String,
     profile: SmsParserProfile
 ): Double? {
+    return extractAmountFromPatterns(message, profile.amountPatterns)
+}
 
-    for (pattern in profile.amountPatterns) {
+private fun extractAmountFromPatterns(
+    message: String,
+    patterns: List<Regex>
+): Double? {
+    for (pattern in patterns) {
         val match = pattern.find(message) ?: continue
-
-        val cleaned = match.value
+        val captured = match.groupValues.getOrNull(1)
+        val numberText = (captured ?: match.value)
             .replace("ETB", "", ignoreCase = true)
             .replace("Birr", "", ignoreCase = true)
             .replace(",", "")
             .trim()
-
-        val amount = cleaned.toDoubleOrNull()
-
-        if (amount != null && amount > 0.0) {
-            return amount
-        }
+        val amount = numberText.toDoubleOrNull()
+            ?: Regex("""[0-9]+(?:\.[0-9]+)?""")
+                .find(numberText)?.value?.toDoubleOrNull()
+        if (amount != null && amount > 0.0) return amount
     }
-
     return null
 }
 
-   
+private fun extractFeeAmount(
+    message: String,
+    profile: SmsParserProfile
+): Double? {
+    if (profile.feePatterns.isEmpty()) return null
+
+    var total = 0.0
+    var foundAny = false
+    for (pattern in profile.feePatterns) {
+        for (match in pattern.findAll(message)) {
+            val captured = match.groupValues.getOrNull(1) ?: continue
+            val value = captured.replace(",", "").toDoubleOrNull() ?: continue
+            if (value >= 0.0) {
+                total += value
+                foundAny = true
+            }
+        }
+    }
+    return if (foundAny) total else null
+}
+
 private fun extractReference(
     message: String,
     profile: SmsParserProfile
