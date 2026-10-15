@@ -61,6 +61,12 @@ interface TransactionDao {
         accountId: Long
     ): Flow<Double>
 
+    @Query("SELECT COUNT(*) FROM transactions WHERE category = :category AND type = :type")
+    suspend fun countTransactionsWithCategory(category: String, type: String): Int
+
+    @Query("UPDATE transactions SET category = :newName WHERE category = :oldName AND type = :type")
+    suspend fun renameTransactionCategory(oldName: String, newName: String, type: String)
+
     @Insert
     suspend fun insertTransaction(
         transaction: TransactionEntity
