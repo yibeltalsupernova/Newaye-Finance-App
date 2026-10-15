@@ -46,6 +46,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -56,6 +57,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.newaye.finance.data.local.NewayeDatabase
 import com.newaye.finance.data.local.entity.AccountEntity
+import com.newaye.finance.data.local.entity.CategoryEntity
 import com.newaye.finance.data.local.entity.TransactionEntity
 import com.newaye.finance.data.repository.TransactionRepository
 import com.newaye.finance.ui.TransactionViewModel
@@ -101,6 +103,25 @@ fun NewayeApp(
 
     var showTransactions by remember {
         mutableStateOf(false)
+    }
+
+    var showCategories by remember {
+        mutableStateOf(false)
+    }
+
+    LaunchedEffect(database) {
+        val categoryDao = database.categoryDao()
+        if (categoryDao.countCategories() == 0) {
+            categoryDao.insertCategories(defaultCategories())
+        }
+    }
+
+    if (showCategories) {
+        CategoriesScreen(
+            database = database,
+            onBack = { showCategories = false }
+        )
+        return
     }
 
     if (showAccounts) {
@@ -180,6 +201,9 @@ fun NewayeApp(
                     },
                     onTransactionsClick = {
                         showTransactions = true
+                    },
+                    onCategoriesClick = {
+                        showCategories = true
                     }
                 )
 
@@ -193,7 +217,8 @@ fun NewayeApp(
 fun Dashboard(
     database: NewayeDatabase,
     onAccountsClick: () -> Unit,
-    onTransactionsClick: () -> Unit
+    onTransactionsClick: () -> Unit,
+    onCategoriesClick: () -> Unit
 ) {
 
     val totalBalance by database
@@ -409,6 +434,14 @@ fun Dashboard(
             )
 
             Text("Manage Accounts")
+        }
+
+        OutlinedButton(
+            onClick = onCategoriesClick,
+            modifier = androidx.compose.ui.Modifier.fillMaxWidth(),
+            shape = androidx.compose.foundation.shape.RoundedCornerShape(18.dp)
+        ) {
+            Text("Manage Categories")
         }
 
         Card(
@@ -667,6 +700,7 @@ fun TransactionsScreen(
     if (showAddDialog) {
 
         TransactionDialog(
+            database = database,
             title = "Add Transaction",
             accounts = accounts,
             transaction = null,
@@ -686,6 +720,7 @@ fun TransactionsScreen(
     editingTransaction?.let { transaction ->
 
         TransactionDialog(
+            database = database,
             title = "Edit Transaction",
             accounts = accounts,
             transaction = transaction,
@@ -875,6 +910,7 @@ fun TransactionCard(
 
 @Composable
 fun TransactionDialog(
+    database: NewayeDatabase,
     title: String,
     accounts: List<AccountEntity>,
     transaction: TransactionEntity?,
@@ -930,30 +966,9 @@ fun TransactionDialog(
         mutableStateOf(false)
     }
 
-    val categories =
-        if (type == "INCOME") {
-
-            listOf(
-                "Salary",
-                "Business",
-                "Gift",
-                "Interest",
-                "Other Income"
-            )
-
-        } else {
-
-            listOf(
-                "Food",
-                "Transport",
-                "Rent",
-                "Utilities",
-                "Shopping",
-                "Education",
-                "Health",
-                "Other Expense"
-            )
-        }
+    val categories by database.categoryDao()
+        .getCategoriesByType(type)
+        .collectAsStateWithLifecycle(initialValue = emptyList())
 
     var categoryMenuExpanded by remember {
         mutableStateOf(false)
@@ -1110,15 +1125,13 @@ fun TransactionDialog(
 
                             DropdownMenuItem(
                                 text = {
-                                    Text(item)
+                                    Text(item.name)
                                 },
                                 onClick = {
 
-                                    category =
-                                        item
+                                    category = item.name
 
-                                    categoryMenuExpanded =
-                                        false
+                                    categoryMenuExpanded = false
                                 }
                             )
                         }
@@ -1200,6 +1213,229 @@ fun TransactionDialog(
             }
         }
     )
+}
+
+
+private fun defaultCategories(): List<CategoryEntity> = listOf(
+    CategoryEntity(name = "Salary", type = "INCOME", isDefault = true),
+    CategoryEntity(name = "Business Income", type = "INCOME", isDefault = true),
+    CategoryEntity(name = "Gift", type = "INCOME", isDefault = true),
+    CategoryEntity(name = "Interest", type = "INCOME", isDefault = true),
+    CategoryEntity(name = "Other Income", type = "INCOME", isDefault = true),
+    CategoryEntity(name = "Food", type = "EXPENSE", isDefault = true),
+    CategoryEntity(name = "Transport", type = "EXPENSE", isDefault = true),
+    CategoryEntity(name = "Rent", type = "EXPENSE", isDefault = true),
+    CategoryEntity(name = "Utilities", type = "EXPENSE", isDefault = true),
+    CategoryEntity(name = "Shopping", type = "EXPENSE", isDefault = true),
+    CategoryEntity(name = "Education", type = "EXPENSE", isDefault = true),
+    CategoryEntity(name = "Health", type = "EXPENSE", isDefault = true),
+    CategoryEntity(name = "Other Expense", type = "EXPENSE", isDefault = true)
+)
+
+@Composable
+fun CategoriesScreen(
+    database: NewayeDatabase,
+    onBack: () -> Unit
+) {
+    val categoryDao = database.categoryDao()
+    val categories by categoryDao.getAllCategories()
+        .collectAsStateWithLifecycle(initialValue = emptyList())
+    val scope = rememberCoroutineScope()
+
+    var showEditor by remember { mutableStateOf(false) }
+    var editingCategory by remember { mutableStateOf<CategoryEntity?>(null) }
+    var categoryName by remember { mutableStateOf("") }
+    var categoryType by remember { mutableStateOf("EXPENSE") }
+    var validationMessage by remember { mutableStateOf<String?>(null) }
+    var deletingCategory by remember { mutableStateOf<CategoryEntity?>(null) }
+    var deleteMessage by remember { mutableStateOf<String?>(null) }
+
+    Column(
+        modifier = androidx.compose.ui.Modifier
+            .fillMaxSize()
+            .verticalScroll(rememberScrollState())
+            .padding(20.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        Row(
+            modifier = androidx.compose.ui.Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = androidx.compose.ui.Alignment.CenterVertically
+        ) {
+            TextButton(onClick = onBack) { Text("← Back") }
+            Text("Categories", style = MaterialTheme.typography.headlineSmall)
+            IconButton(onClick = {
+                editingCategory = null
+                categoryName = ""
+                categoryType = "EXPENSE"
+                validationMessage = null
+                showEditor = true
+            }) {
+                Icon(Icons.Default.Add, contentDescription = "Add category")
+            }
+        }
+
+        Text(
+            "Organize income and expenses with categories. Changes are saved on this device.",
+            color = androidx.compose.ui.graphics.Color.DarkGray
+        )
+
+        listOf("INCOME", "EXPENSE").forEach { groupType ->
+            Text(
+                if (groupType == "INCOME") "Income categories" else "Expense categories",
+                style = MaterialTheme.typography.titleMedium,
+                color = DeepGreen
+            )
+            val group = categories.filter { it.type == groupType }
+            if (group.isEmpty()) {
+                Text("No categories yet.")
+            } else {
+                group.forEach { item ->
+                    Card(modifier = androidx.compose.ui.Modifier.fillMaxWidth()) {
+                        Row(
+                            modifier = androidx.compose.ui.Modifier
+                                .fillMaxWidth()
+                                .padding(start = 14.dp, end = 4.dp, top = 6.dp, bottom = 6.dp),
+                            verticalAlignment = androidx.compose.ui.Alignment.CenterVertically
+                        ) {
+                            Column(modifier = androidx.compose.ui.Modifier.weight(1f)) {
+                                Text(item.name, fontWeight = FontWeight.Medium)
+                                Text(
+                                    if (item.isDefault) "Default category" else "Custom category",
+                                    fontSize = 12.sp,
+                                    color = androidx.compose.ui.graphics.Color.Gray
+                                )
+                            }
+                            IconButton(onClick = {
+                                editingCategory = item
+                                categoryName = item.name
+                                categoryType = item.type
+                                validationMessage = null
+                                showEditor = true
+                            }) {
+                                Icon(Icons.Default.Edit, contentDescription = "Rename ${item.name}")
+                            }
+                            if (!item.isDefault) {
+                                IconButton(onClick = {
+                                    scope.launch {
+                                        val used = database.transactionDao()
+                                            .countTransactionsWithCategory(item.name, item.type)
+                                        if (used > 0) {
+                                            deleteMessage = "This category is used by $used transaction(s). Rename it instead, or reassign those transactions before deleting."
+                                        } else {
+                                            deletingCategory = item
+                                        }
+                                    }
+                                }) {
+                                    Icon(Icons.Default.Delete, contentDescription = "Delete ${item.name}")
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    if (showEditor) {
+        AlertDialog(
+            onDismissRequest = { showEditor = false },
+            title = { Text(if (editingCategory == null) "Add Category" else "Rename Category") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    OutlinedTextField(
+                        value = categoryName,
+                        onValueChange = { categoryName = it; validationMessage = null },
+                        label = { Text("Category name") },
+                        singleLine = true
+                    )
+                    if (editingCategory == null) {
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            OutlinedButton(
+                                onClick = { categoryType = "INCOME" },
+                                modifier = androidx.compose.ui.Modifier.weight(1f)
+                            ) { Text(if (categoryType == "INCOME") "✓ Income" else "Income") }
+                            OutlinedButton(
+                                onClick = { categoryType = "EXPENSE" },
+                                modifier = androidx.compose.ui.Modifier.weight(1f)
+                            ) { Text(if (categoryType == "EXPENSE") "✓ Expense" else "Expense") }
+                        }
+                    } else {
+                        Text("Type: ${if (categoryType == "INCOME") "Income" else "Expense"}")
+                    }
+                    validationMessage?.let { Text(it, color = androidx.compose.ui.graphics.Color.Red) }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    val cleaned = categoryName.trim()
+                    val duplicate = categories.any {
+                        it.type == categoryType &&
+                            it.name.equals(cleaned, ignoreCase = true) &&
+                            it.id != editingCategory?.id
+                    }
+                    when {
+                        cleaned.isBlank() -> validationMessage = "Enter a category name."
+                        cleaned.length > 40 -> validationMessage = "Use 40 characters or fewer."
+                        duplicate -> validationMessage = "A category with this name already exists for this type."
+                        else -> {
+                            scope.launch {
+                                val old = editingCategory
+                                if (old == null) {
+                                    categoryDao.insertCategory(
+                                        CategoryEntity(name = cleaned, type = categoryType)
+                                    )
+                                } else {
+                                    categoryDao.updateCategory(old.copy(name = cleaned))
+                                    if (old.name != cleaned) {
+                                        database.transactionDao().renameTransactionCategory(
+                                            oldName = old.name,
+                                            newName = cleaned,
+                                            type = old.type
+                                        )
+                                    }
+                                }
+                                showEditor = false
+                            }
+                        }
+                    }
+                }) { Text("Save") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showEditor = false }) { Text("Cancel") }
+            }
+        )
+    }
+
+    deletingCategory?.let { item ->
+        AlertDialog(
+            onDismissRequest = { deletingCategory = null },
+            title = { Text("Delete category?") },
+            text = { Text("Delete '${item.name}'? This cannot be undone.") },
+            confirmButton = {
+                TextButton(onClick = {
+                    scope.launch {
+                        categoryDao.deleteCategory(item)
+                        deletingCategory = null
+                    }
+                }) { Text("Delete") }
+            },
+            dismissButton = {
+                TextButton(onClick = { deletingCategory = null }) { Text("Cancel") }
+            }
+        )
+    }
+
+    deleteMessage?.let { message ->
+        AlertDialog(
+            onDismissRequest = { deleteMessage = null },
+            title = { Text("Category is in use") },
+            text = { Text(message) },
+            confirmButton = {
+                TextButton(onClick = { deleteMessage = null }) { Text("OK") }
+            }
+        )
+    }
 }
 
 @Composable
