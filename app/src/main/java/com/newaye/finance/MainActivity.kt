@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
@@ -48,6 +49,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -61,6 +63,7 @@ import com.newaye.finance.ui.TransactionViewModelFactory
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import java.util.Calendar
 import kotlin.math.abs
 
 private val DeepGreen = androidx.compose.ui.graphics.Color(0xFF004D00)
@@ -200,23 +203,48 @@ fun Dashboard(
             initialValue = 0.0
         )
 
-    val totalIncome by database
+    // Observe transactions once so dashboard totals and recent activity
+    // are calculated from the same reactive database snapshot.
+    val transactions by database
         .transactionDao()
-        .getTotalIncome()
-        .collectAsStateWithLifecycle(
-            initialValue = 0.0
-        )
+        .getAllTransactions()
+        .collectAsStateWithLifecycle(initialValue = emptyList())
 
-    val totalExpenses by database
-        .transactionDao()
-        .getTotalExpenses()
-        .collectAsStateWithLifecycle(
-            initialValue = 0.0
-        )
+    val totalIncome = transactions
+        .filter { it.type == "INCOME" }
+        .sumOf { it.amount }
+
+    val totalExpenses = transactions
+        .filter { it.type == "EXPENSE" }
+        .sumOf { it.amount }
+
+    val monthRange = remember {
+        val calendar = Calendar.getInstance().apply {
+            set(Calendar.DAY_OF_MONTH, 1)
+            set(Calendar.HOUR_OF_DAY, 0)
+            set(Calendar.MINUTE, 0)
+            set(Calendar.SECOND, 0)
+            set(Calendar.MILLISECOND, 0)
+        }
+        val start = calendar.timeInMillis
+        calendar.add(Calendar.MONTH, 1)
+        start until calendar.timeInMillis
+    }
+
+    val currentMonthIncome = transactions
+        .filter { it.type == "INCOME" && it.date in monthRange }
+        .sumOf { it.amount }
+
+    val currentMonthExpenses = transactions
+        .filter { it.type == "EXPENSE" && it.date in monthRange }
+        .sumOf { it.amount }
+
+    val recentTransactions = transactions.take(5)
 
     Column(
         modifier = androidx.compose.ui.Modifier
             .fillMaxSize()
+            .verticalScroll(rememberScrollState())
             .padding(20.dp),
         verticalArrangement =
             Arrangement.spacedBy(16.dp)
@@ -320,6 +348,24 @@ fun Dashboard(
             )
         }
 
+        Row(
+            modifier = androidx.compose.ui.Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            SmallCard(
+                title = "Income this month",
+                amount = "ETB %.2f".format(currentMonthIncome),
+                accent = Green,
+                modifier = androidx.compose.ui.Modifier.weight(1f)
+            )
+            SmallCard(
+                title = "Expenses this month",
+                amount = "ETB %.2f".format(currentMonthExpenses),
+                accent = LightGreen,
+                modifier = androidx.compose.ui.Modifier.weight(1f)
+            )
+        }
+
         Button(
             onClick = onTransactionsClick,
             modifier = androidx.compose.ui.Modifier
@@ -384,29 +430,53 @@ fun Dashboard(
                 Text(
                     "Recent Transactions",
                     color = DeepGreen,
-                    fontWeight =
-                        androidx.compose.ui.text.font.FontWeight.Bold
+                    fontWeight = androidx.compose.ui.text.font.FontWeight.Bold
                 )
 
-                Spacer(
-                    modifier = androidx.compose.ui.Modifier
-                        .height(8.dp)
-                )
+                Spacer(modifier = androidx.compose.ui.Modifier.height(8.dp))
 
-                Text(
-                    "Open Manage Transactions to view your transaction history.",
-                    color = androidx.compose.ui.graphics.Color.DarkGray
-                )
+                if (recentTransactions.isEmpty()) {
+                    Text(
+                        "No transactions yet. Add your first transaction to see it here.",
+                        color = androidx.compose.ui.graphics.Color.DarkGray
+                    )
+                } else {
+                    recentTransactions.forEach { transaction ->
+                        Row(
+                            modifier = androidx.compose.ui.Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 6.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Column(
+                                modifier = androidx.compose.ui.Modifier.weight(1f)
+                            ) {
+                                Text(
+                                    transaction.category.ifBlank { "Uncategorized" },
+                                    color = DeepGreen,
+                                    fontWeight = FontWeight.Medium
+                                )
+                                Text(
+                                    SimpleDateFormat("dd MMM yyyy", Locale.getDefault())
+                                        .format(Date(transaction.date)),
+                                    color = androidx.compose.ui.graphics.Color.DarkGray,
+                                    fontSize = 12.sp
+                                )
+                            }
+                            Text(
+                                text = (if (transaction.type == "INCOME") "+" else "−") +
+                                    " ETB %.2f".format(transaction.amount),
+                                color = if (transaction.type == "INCOME") Green else DeepGreen,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                        }
+                    }
+                }
             }
         }
 
-        Spacer(
-            modifier = androidx.compose.ui.Modifier
-                .weight(1f)
-        )
-
         Text(
-            text = "Milestone 3 • Transactions",
+            text = "Milestone 6 • Dashboard",
             color = LightGreen,
             modifier = androidx.compose.ui.Modifier
                 .align(
